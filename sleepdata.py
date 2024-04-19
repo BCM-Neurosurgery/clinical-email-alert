@@ -134,7 +134,7 @@ class SleepData:
         # Call the first function and pass its ax to the first subplot
         self.plot_sleep_interval_on_day(axes[0], day)
         self.plot_sleep_phase_5_min(axes[1], day)
-        self.plot_sleep_distribution_for_day(None, day)
+        self.plot_sleep_distribution_for_day(day)
 
         plt.tight_layout()
         plt.gcf().autofmt_xdate()
@@ -176,7 +176,7 @@ class SleepData:
         ax.legend()
         plt.grid(True)
 
-    def plot_sleep_distribution_for_day(self, ax, day):
+    def plot_sleep_distribution_for_day(self, day):
         """
         Plot the distribution of sleep phase per day
         """
