@@ -193,6 +193,14 @@ class SleepData:
             percentages = {phase: (cnt / total * 100) for phase, cnt in count.items()}
             percentage_data.append(percentages)
 
+        # Define phase mapping
+        phase_mapping = {
+            "1": "Deep Sleep",
+            "2": "Light Sleep",
+            "3": "REM Sleep",
+            "4": "Awake",
+        }
+
         phases = ["1", "2", "3", "4"]
 
         # Prepare data for plotting
@@ -211,7 +219,10 @@ class SleepData:
         for i, phase in enumerate(phases):
             bar_positions = x_positions + i * bar_width
             bars = ax.bar(
-                bar_positions, plot_data[phase], width=bar_width, label=f"Phase {phase}"
+                bar_positions,
+                plot_data[phase],
+                width=bar_width,
+                label=f"{phase_mapping[phase]}",
             )
 
             # Adding percentage labels above bars
