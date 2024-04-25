@@ -232,6 +232,81 @@ class SleepData:
         ax.set_xticklabels([f"Section {i+1}" for i in x_positions])
         ax.legend()
 
+    def plot_sleep_distribution_for_week(self):
+        """
+        Plot sleep distribution for the past week ending at day
+        """
+
+        sleep_data = {}
+
+        for entry in self.data:
+            day = entry["day"]
+            sleep_phases = entry["sleep_phase_5_min"]
+            phase_counts = Counter(sleep_phases)  # Count occurrences of each phase
+
+            if day not in sleep_data:
+                sleep_data[day] = Counter()
+
+            sleep_data[day] += phase_counts
+
+        # Convert counts to hours (assuming each phase count is in 5 minutes increments)
+        for day in sleep_data:
+            for phase in sleep_data[day]:
+                sleep_data[day][phase] = (
+                    sleep_data[day][phase] * 5
+                ) / 60  # Convert to hours
+
+        # Creating DataFrame
+        df = pd.DataFrame.from_dict(sleep_data, orient="index").fillna(0)
+        # Rename columns based on sleep phase descriptions
+        phase_mapping = {
+            "1": "Deep Sleep",
+            "2": "Light Sleep",
+            "3": "REM Sleep",
+            "4": "Awake",
+        }
+        df.columns = [phase_mapping.get(col, f"Phase {col}") for col in df.columns]
+
+        # Plotting
+        ax = df.plot(kind="bar", stacked=True, figsize=(10, 7))
+        ax.set_title("Distribution of Sleep Phases per Day")
+        ax.set_ylabel("Hours")
+        plt.xticks(rotation=45)
+
+        # Adding labels to each bar
+        for p in ax.patches:
+            width, height = p.get_width(), p.get_height()
+            if (
+                height > 0
+            ):  # Only label the bar if the height is significant to avoid clutter
+                x, y = p.get_xy()
+                ax.text(
+                    x + width / 2,
+                    y + height / 2,
+                    f"{height:.1f}",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+
+        # Calculate total hours of sleep per day, excluding the Awake phase
+        sleep_columns = [
+            "Deep Sleep",
+            "Light Sleep",
+            "REM Sleep",
+        ]  # Only these phases contribute to sleep
+        df["Total Sleep"] = df[sleep_columns].sum(axis=1)
+        average_sleep = df["Total Sleep"].mean()
+        plt.axhline(
+            y=average_sleep,
+            color="r",
+            linestyle="--",
+            label=f"Average Sleep ({average_sleep:.2f} hrs)",
+        )
+
+        plt.legend(title="Sleep Phases and Averages")
+        plt.tight_layout()
+        plt.show()
+
 
 class SleepDataOneDay:
     def __init__(self) -> None:
