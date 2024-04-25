@@ -1,6 +1,6 @@
 import json
 import matplotlib.pyplot as plt
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 import matplotlib.dates as mdates
 import utils
 import pandas as pd
@@ -304,6 +304,69 @@ class SleepData:
         )
 
         plt.legend(title="Sleep Phases and Averages")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_sleep_habit_for_week(self):
+        """
+        y - hours when the patient goes to sleep and when he/she wakes up
+        x - day for the week
+        """
+        # Extracting bedtime start and end times
+        sleep_times = {"Day": [], "Sleep Start": [], "Wake Time": []}
+
+        for entry in self.data:
+            sleep_start = pd.to_datetime(entry["bedtime_start"])
+            wake_time = pd.to_datetime(entry["bedtime_end"])
+            sleep_times["Day"].append(entry["day"])
+            # Convert time to minutes since midnight
+            # sleep_times['Sleep Start'].append(sleep_start.hour * 60 + sleep_start.minute)
+            # sleep_times['Wake Time'].append(wake_time.hour * 60 + wake_time.minute)
+            sleep_times["Sleep Start"].append(sleep_start)
+            sleep_times["Wake Time"].append(wake_time)
+            # Only time part, converted to a datetime object with a generic date
+            # sleep_times['Sleep Start'].append(datetime.combine(datetime.min, sleep_start.time()))
+            # sleep_times['Wake Time'].append(datetime.combine(datetime.min, wake_time.time()))
+
+        # Creating DataFrame
+        df_sleep = pd.DataFrame(sleep_times)
+        df_sleep["Day"] = pd.Categorical(
+            df_sleep["Day"], categories=pd.unique(df_sleep["Day"]), ordered=True
+        )
+
+        # Plot setup
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # Set up the y-axis to show 24 hours, using datetime
+        start_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        time_ticks = [
+            start_day + timedelta(hours=i) for i in range(25)
+        ]  # Creating time ticks for every hour in a day
+
+        ax.yaxis.set_major_locator(mdates.HourLocator(interval=1))
+        ax.yaxis.set_major_formatter(
+            mdates.DateFormatter("%H:%M")
+        )  # Format time as hours and minutes
+
+        # Plot each sleep period as a vertical line on the graph
+        for _, row in df_sleep.iterrows():
+            # Plot line for each sleep interval
+            plt.vlines(
+                x=row["Day"],
+                ymin=row["Sleep Start"],
+                ymax=row["Wake Time"],
+                colors="blue",
+                lw=4,
+            )
+
+        # Customize the plot
+        ax.set_xlabel("Day of the Week")
+        ax.set_ylabel("Time of Day (HH:MM)")
+        ax.set_title("Daily Sleep Schedule Across the Week")
+        fig.autofmt_xdate()  # Auto-format x-axis dates
+        # plt.ylim([mdates.date2num(start_day), mdates.date2num(start_day + timedelta(hours=24))])  # Set y-limits to cover one full day
+        # plt.ylim([mdates.date2num(datetime.combine(datetime.min, time(0,0))), mdates.date2num(datetime.combine(datetime.min, time(23,59)))])  # Set y-limits to cover one full day
+        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
         plt.tight_layout()
         plt.show()
 
