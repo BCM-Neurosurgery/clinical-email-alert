@@ -318,15 +318,36 @@ class SleepData:
         for entry in self.data:
             sleep_start = pd.to_datetime(entry["bedtime_start"])
             wake_time = pd.to_datetime(entry["bedtime_end"])
-            sleep_times["Day"].append(entry["day"])
-            # Convert time to minutes since midnight
-            # sleep_times['Sleep Start'].append(sleep_start.hour * 60 + sleep_start.minute)
-            # sleep_times['Wake Time'].append(wake_time.hour * 60 + wake_time.minute)
-            sleep_times["Sleep Start"].append(sleep_start)
-            sleep_times["Wake Time"].append(wake_time)
-            # Only time part, converted to a datetime object with a generic date
-            # sleep_times['Sleep Start'].append(datetime.combine(datetime.min, sleep_start.time()))
-            # sleep_times['Wake Time'].append(datetime.combine(datetime.min, wake_time.time()))
+            fixed_date = datetime(2000, 1, 1)
+
+            if sleep_start.date() != wake_time.date():
+                # Sleep start to midnight
+                sleep_times["Day"].append(sleep_start.date())
+                sleep_times["Sleep Start"].append(
+                    fixed_date
+                    + timedelta(hours=sleep_start.hour, minutes=sleep_start.minute)
+                )
+                sleep_times["Wake Time"].append(
+                    fixed_date + timedelta(hours=24)
+                )  # Midnight as end time
+
+                # Midnight to wake time
+                sleep_times["Day"].append(wake_time.date())
+                sleep_times["Sleep Start"].append(fixed_date)  # Start at midnight
+                sleep_times["Wake Time"].append(
+                    fixed_date
+                    + timedelta(hours=wake_time.hour, minutes=wake_time.minute)
+                )
+            else:
+                sleep_times["Day"].append(sleep_start.date())
+                sleep_times["Sleep Start"].append(
+                    fixed_date
+                    + timedelta(hours=sleep_start.hour, minutes=sleep_start.minute)
+                )
+                sleep_times["Wake Time"].append(
+                    fixed_date
+                    + timedelta(hours=wake_time.hour, minutes=wake_time.minute)
+                )
 
         # Creating DataFrame
         df_sleep = pd.DataFrame(sleep_times)
@@ -337,36 +358,32 @@ class SleepData:
         # Plot setup
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        # Set up the y-axis to show 24 hours, using datetime
-        start_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        time_ticks = [
-            start_day + timedelta(hours=i) for i in range(25)
-        ]  # Creating time ticks for every hour in a day
+        # Generate time ticks from 21:00 of the start day to 17:00 of the next day
+        start_time = datetime(2000, 1, 1, 0, 0)  # Start of the arbitrary day
+        end_time = datetime(2000, 1, 1, 23, 59)  # End of the arbitrary day
 
         ax.yaxis.set_major_locator(mdates.HourLocator(interval=1))
-        ax.yaxis.set_major_formatter(
-            mdates.DateFormatter("%H:%M")
-        )  # Format time as hours and minutes
+        ax.yaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
 
         # Plot each sleep period as a vertical line on the graph
         for _, row in df_sleep.iterrows():
-            # Plot line for each sleep interval
+            start_time_num = mdates.date2num(row["Sleep Start"])
+            end_time_num = mdates.date2num(row["Wake Time"])
             plt.vlines(
                 x=row["Day"],
-                ymin=row["Sleep Start"],
-                ymax=row["Wake Time"],
+                ymin=start_time_num,
+                ymax=end_time_num,
                 colors="blue",
                 lw=4,
             )
 
         # Customize the plot
-        ax.set_xlabel("Day of the Week")
         ax.set_ylabel("Time of Day (HH:MM)")
         ax.set_title("Daily Sleep Schedule Across the Week")
         fig.autofmt_xdate()  # Auto-format x-axis dates
-        # plt.ylim([mdates.date2num(start_day), mdates.date2num(start_day + timedelta(hours=24))])  # Set y-limits to cover one full day
-        # plt.ylim([mdates.date2num(datetime.combine(datetime.min, time(0,0))), mdates.date2num(datetime.combine(datetime.min, time(23,59)))])  # Set y-limits to cover one full day
-        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+        plt.ylim(
+            [mdates.date2num(start_time), mdates.date2num(end_time)]
+        )  # Set y-limits to cover one full day        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
         plt.tight_layout()
         plt.show()
 
