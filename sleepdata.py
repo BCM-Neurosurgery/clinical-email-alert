@@ -402,6 +402,91 @@ class SleepData:
         plt.tight_layout()
         plt.show()
 
+    def plot_sleep_habit_for_week_polar(self):
+        # Convert data into a DataFrame and convert times to datetime
+        df = pd.DataFrame(self.data)
+        df["bedtime_start"] = pd.to_datetime(df["bedtime_start"])
+        df["bedtime_end"] = pd.to_datetime(df["bedtime_end"])
+        df["day"] = pd.to_datetime(df["day"])
+
+        df.sort_values("day", inplace=True)
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(10, 10))
+        ax.set_theta_direction(-1)
+        ax.set_theta_zero_location("N")
+
+        # Professional enhancements
+        ax.set_facecolor("floralwhite")  # Set a gentle background color
+        fig.set_facecolor("floralwhite")
+
+        base_radius = 10  # Radius of the innermost circle
+        width = 2  # Width of each ring
+
+        # Define colors and styles
+        alpha = 0.75  # Slightly less transparency for better visibility
+        color = "purple"
+
+        unique_days = df["day"].drop_duplicates().reset_index(drop=True)
+        for index, day in enumerate(unique_days):
+            day_data = df[df["day"] == day]
+            radius = base_radius + index * width
+            for _, row in day_data.iterrows():
+                # Convert timezone-aware datetime to the correct number for plotting
+                start_frac = (
+                    row["bedtime_start"] - row["bedtime_start"].normalize()
+                ).total_seconds() / 86400
+                end_frac = (
+                    row["bedtime_end"] - row["bedtime_end"].normalize()
+                ).total_seconds() / 86400
+
+                start_theta = start_frac * 2 * np.pi
+                end_theta = end_frac * 2 * np.pi
+
+                # If bedtime goes over midnight
+                if start_theta > end_theta:
+                    ax.barh(
+                        radius,
+                        2 * np.pi - start_theta,
+                        left=start_theta,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                    )
+                    ax.barh(
+                        radius,
+                        end_theta,
+                        left=0,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                    )
+                else:
+                    ax.barh(
+                        radius,
+                        end_theta - start_theta,
+                        left=start_theta,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                    )
+
+        ax.set_rticks([])  # Hide radial ticks
+        ax.set_xticks(
+            np.linspace(0, 2 * np.pi, 24, endpoint=False)
+        )  # Set ticks every hour
+        ax.set_xticklabels(
+            [f"{(i % 24):02d}:00" for i in range(24)]
+        )  # Label every hour
+
+        # Title and labels
+        plt.title(
+            "Sleep Patterns Over Multiple Days",
+            va="bottom",
+            family="serif",
+            fontsize=16,
+        )
+        plt.show()
+
 
 class SleepDataOneDay:
     def __init__(self) -> None:

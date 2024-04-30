@@ -23,4 +23,5 @@ if __name__ == "__main__":
     y - clock datetime
     x - day
     """
-    data.plot_sleep_habit_for_week()
+    # data.plot_sleep_habit_for_week()
+    data.plot_sleep_habit_for_week_polar()
