@@ -373,7 +373,6 @@ class SleepData:
         # Plot setup
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        # Generate time ticks from 21:00 of the start day to 17:00 of the next day
         start_time = datetime(2000, 1, 1, 0, 0)  # Start of the arbitrary day
         end_time = datetime(2000, 1, 1, 23, 59)  # End of the arbitrary day
 
@@ -398,7 +397,7 @@ class SleepData:
         fig.autofmt_xdate()  # Auto-format x-axis dates
         plt.ylim(
             [mdates.date2num(start_time), mdates.date2num(end_time)]
-        )  # Set y-limits to cover one full day        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+        )  # Set y-limits to cover one full day
         plt.tight_layout()
         plt.show()
 
@@ -415,15 +414,13 @@ class SleepData:
         ax.set_theta_direction(-1)
         ax.set_theta_zero_location("N")
 
-        # Professional enhancements
-        ax.set_facecolor("floralwhite")  # Set a gentle background color
+        ax.set_facecolor("floralwhite")
         fig.set_facecolor("floralwhite")
 
         base_radius = 10  # Radius of the innermost circle
-        width = 2  # Width of each ring
+        width = 2
 
-        # Define colors and styles
-        alpha = 0.75  # Slightly less transparency for better visibility
+        alpha = 0.75
         color = "purple"
 
         unique_days = df["day"].drop_duplicates().reset_index(drop=True)
