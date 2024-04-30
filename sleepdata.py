@@ -278,6 +278,10 @@ class SleepData:
         }
         df.columns = [phase_mapping.get(col, f"Phase {col}") for col in df.columns]
 
+        # reorder so that awake is at the top
+        column_order = ["Deep Sleep", "Light Sleep", "REM Sleep", "Awake"]
+        df = df[column_order]
+
         # Plotting
         ax = df.plot(kind="bar", stacked=True, figsize=(10, 7))
         ax.set_title("Distribution of Sleep Phases per Day")
