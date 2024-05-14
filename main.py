@@ -93,20 +93,21 @@ if __name__ == "__main__":
     if not os.path.exists(patient_dir):
         logger.error("Patient Not Found.")
 
-    # get sleep pattern for the past week
-    # going back on and before date
-    dates = get_week_dates(date)
-    sleeps = []
-    for date in dates:
-        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
-        if not os.path.exists(patient_date_json):
-            logger.error(f"{date} sleep data not found.")
-        else:
-            date_list = read_json(patient_date_json)
-            sleeps.extend(date_list)
-    data = SleepData(sleeps)
-    data.plot_sleep_distribution_for_week()
-    data.plot_sleep_habit_for_week_polar()
+    else:
+        # get sleep pattern for the past week
+        # going back on and before date
+        dates = get_week_dates(date)
+        sleeps = []
+        for date in dates:
+            patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+            if not os.path.exists(patient_date_json):
+                logger.error(f"{date} sleep data not found.")
+            else:
+                date_list = read_json(patient_date_json)
+                sleeps.extend(date_list)
+        data = SleepData(sleeps)
+        data.plot_sleep_distribution_for_week()
+        data.plot_sleep_habit_for_week_polar()
 
-    # print(data.plot_sleep_phase_5_min(day))
-    # print(data.get_summary_stat_for_day(day))
+        # print(data.plot_sleep_phase_5_min(day))
+        # print(data.get_summary_stat_for_day(day))
