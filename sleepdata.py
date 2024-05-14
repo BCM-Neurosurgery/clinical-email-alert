@@ -11,17 +11,13 @@ import numpy as np
 
 
 class SleepData:
-    def __init__(self, path) -> None:
+    def __init__(self, data) -> None:
         """
         Args:
             path (str): path to json
         """
-        self.path = path
-        with open(path, "r", encoding="utf-8") as f:
-            self.jsonObj = json.load(f)
-
         # self.data looks like [{}, {}, ..., {}]
-        self.data = self.jsonObj["data"]
+        self.data = data
         # self.sleep_data_one_day -> SleepDataOneDay object
         self.sleep_data_one_day = {}
 
@@ -421,7 +417,8 @@ class SleepData:
         width = 2
 
         alpha = 0.75
-        color = "purple"
+        color = "skyblue"
+        edgecolor = "black"
 
         unique_days = df["day"].drop_duplicates().reset_index(drop=True)
         for index, day in enumerate(unique_days):
@@ -448,6 +445,7 @@ class SleepData:
                         height=width,
                         color=color,
                         alpha=alpha,
+                        edgecolor=edgecolor,
                     )
                     ax.barh(
                         radius,
@@ -456,6 +454,7 @@ class SleepData:
                         height=width,
                         color=color,
                         alpha=alpha,
+                        edgecolor=edgecolor,
                     )
                 else:
                     ax.barh(
@@ -465,7 +464,23 @@ class SleepData:
                         height=width,
                         color=color,
                         alpha=alpha,
+                        edgecolor=edgecolor,
                     )
+
+                # Adding the day label inside the bar
+                mid_theta = (
+                    start_theta + (end_theta - start_theta) / 2
+                    if start_theta <= end_theta
+                    else np.pi
+                )
+                ax.text(
+                    mid_theta,
+                    radius + width / 2,
+                    day,
+                    color="black",
+                    ha="center",
+                    va="center",
+                )
 
         ax.set_rticks([])  # Hide radial ticks
         ax.set_xticks(
