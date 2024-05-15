@@ -429,6 +429,18 @@ class SleepData:
             day_data = df[df["day"] == day]
             radius = base_radius + index * width
             for _, row in day_data.iterrows():
+                if pd.isna(row["bedtime_start"]) and pd.isna(row["bedtime_end"]):
+                    ax.barh(
+                        radius,
+                        0,
+                        left=0,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                        edgecolor=edgecolor,
+                    )
+                    continue
+
                 # Convert timezone-aware datetime to the correct number for plotting
                 start_frac = (
                     row["bedtime_start"] - row["bedtime_start"].normalize()
@@ -477,10 +489,14 @@ class SleepData:
                     if start_theta <= end_theta
                     else np.pi
                 )
+
+                # Format datetime object to date-only string
+                date_string = day.strftime("%Y-%m-%d")
+
                 ax.text(
                     mid_theta,
                     radius + width / 2,
-                    day,
+                    date_string,
                     color="black",
                     ha="center",
                     va="center",
@@ -496,7 +512,7 @@ class SleepData:
 
         # Title and labels
         plt.title(
-            "Sleep Patterns Over Multiple Days",
+            "Sleep Patterns Over Week",
             va="bottom",
             family="serif",
             fontsize=16,

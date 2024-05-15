@@ -86,7 +86,7 @@ if __name__ == "__main__":
     date = "2023-07-05"
 
     # set up logger
-    logger = setup_logger("example_logger", "example.log")
+    logger = setup_logger(patient, log)
 
     # locate patient folder
     patient_dir = os.path.join(dir, patient)
@@ -102,6 +102,14 @@ if __name__ == "__main__":
             patient_date_json = os.path.join(patient_dir, date, "sleep.json")
             if not os.path.exists(patient_date_json):
                 logger.error(f"{date} sleep data not found.")
+                sleeps.append(
+                    {
+                        "day": date,
+                        "sleep_phase_5_min": "",
+                        "bedtime_start": None,
+                        "bedtime_end": None,
+                    }
+                )
             else:
                 date_list = read_json(patient_date_json)
                 sleeps.extend(date_list)
