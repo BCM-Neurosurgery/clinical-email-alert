@@ -217,12 +217,16 @@ class SleepData:
         x_positions = np.arange(len(sleep_data_on_day))
 
         # Plot each phase as separate bars in a group
+        color_palette = get_cmap("Set2").colors[:4]
         for i, phase in enumerate(phases):
             bar_positions = x_positions + i * bar_width
             bars = ax.bar(
                 bar_positions,
                 plot_data[phase],
                 width=bar_width,
+                color=color_palette[i],
+                alpha=0.7,
+                edgecolor="black",
                 label=f"{phase_mapping[phase]}",
             )
 
@@ -288,7 +292,7 @@ class SleepData:
         df = df[column_order]
 
         # Plotting
-        color_palette = get_cmap("Set1").colors[:4]
+        color_palette = get_cmap("Set2").colors[:4]
         ax = df.plot(
             kind="bar",
             stacked=True,
