@@ -6,6 +6,7 @@ import utils
 import pandas as pd
 from collections import Counter
 import numpy as np
+from matplotlib.cm import get_cmap
 
 # TODO: how to define a day?
 
@@ -425,11 +426,12 @@ class SleepData:
         width = 2
 
         alpha = 0.75
-        color = "skyblue"
         edgecolor = "black"
+        color_palette = get_cmap("Set2").colors[:7]
 
         unique_days = df["day"].drop_duplicates().reset_index(drop=True)
         for index, day in enumerate(unique_days):
+            color = color_palette[index % 7]
             day_data = df[df["day"] == day]
             radius = base_radius + index * width
             for _, row in day_data.iterrows():
@@ -487,24 +489,13 @@ class SleepData:
                         edgecolor=edgecolor,
                     )
 
-                # Adding the day label inside the bar
-                mid_theta = (
-                    start_theta + (end_theta - start_theta) / 2
-                    if start_theta <= end_theta
-                    else np.pi
-                )
-
-                # Format datetime object to date-only string
-                date_string = day.strftime("%Y-%m-%d")
-
-                ax.text(
-                    mid_theta,
-                    radius + width / 2,
-                    date_string,
-                    color="black",
-                    ha="center",
-                    va="center",
-                )
+        # Create the legend
+        day_labels = [day.strftime("%a %Y-%m-%d") for day in unique_days]
+        handles = [
+            plt.Rectangle((0, 0), 1, 1, color=color_palette[i % 7], alpha=alpha)
+            for i in range(len(unique_days))
+        ]
+        plt.legend(handles, day_labels, loc="upper left", bbox_to_anchor=(1, 1))
 
         ax.set_rticks([])  # Hide radial ticks
         ax.set_xticks(
