@@ -288,7 +288,15 @@ class SleepData:
         df = df[column_order]
 
         # Plotting
-        ax = df.plot(kind="bar", stacked=True, figsize=(10, 7))
+        color_palette = get_cmap("Set1").colors[:4]
+        ax = df.plot(
+            kind="bar",
+            stacked=True,
+            color=color_palette,
+            alpha=0.7,
+            edgecolor="black",
+            figsize=(10, 7),
+        )
         ax.set_title("Distribution of Sleep Phases per Day")
         ax.set_ylabel("Hours")
         plt.xticks(rotation=45)
