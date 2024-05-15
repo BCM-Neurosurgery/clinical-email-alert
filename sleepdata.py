@@ -243,7 +243,6 @@ class SleepData:
         """
         Plot sleep distribution for the past week ending at day
         """
-
         sleep_data = {}
 
         for entry in self.data:
@@ -263,8 +262,13 @@ class SleepData:
                     sleep_data[day][phase] * 5
                 ) / 60  # Convert to hours
 
-        # Creating DataFrame
-        df = pd.DataFrame.from_dict(sleep_data, orient="index").fillna(0)
+        all_keys = ["1", "2", "3", "4"]
+        flattened_data = {
+            date: {key: sleep_data[date].get(key, np.nan) for key in all_keys}
+            for date in sleep_data
+        }
+        df = pd.DataFrame.from_dict(flattened_data, orient="index")
+        df = df.sort_index(ascending=True)
         # Rename columns based on sleep phase descriptions
         phase_mapping = {
             "1": "Deep Sleep",
@@ -306,7 +310,7 @@ class SleepData:
             "REM Sleep",
         ]  # Only these phases contribute to sleep
         df["Total Sleep"] = df[sleep_columns].sum(axis=1)
-        average_sleep = df["Total Sleep"].mean()
+        average_sleep = df.dropna()["Total Sleep"].mean()
         plt.axhline(
             y=average_sleep,
             color="r",
