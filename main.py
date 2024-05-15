@@ -13,6 +13,7 @@ import pytz
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import json
+import pandas as pd
 
 
 # Custom formatter class to handle timezone
@@ -78,12 +79,38 @@ def read_json(json_path: str) -> list:
         return json.load(f)
 
 
+def get_todays_date() -> str:
+    """Get date of today
+
+    Returns:
+        str: e.g. "2024-05-01"
+    """
+    today = d.today()
+    return today.strftime("%Y-%m-%d")
+
+
+def missing_data_on_date(sleep_data: list, date: str) -> bool:
+    """Return True if missing data on date
+
+    Args:
+        sleep_data (list): [{}, {}, ...]
+        date (str): "2023-07-15"
+
+    Returns:
+        bool: True if we are missing data
+    """
+    for data in sleep_data:
+        if data["day"] == date and pd.isna(data["bedtime_start"]):
+            return True
+    return False
+
+
 if __name__ == "__main__":
     # set up vars
     dir = "./oura"
     patient = "Percept004"
     log = "./example.log"
-    date = "2023-07-05"
+    date = "2023-06-27"
 
     # set up logger
     logger = setup_logger(patient, log)
@@ -98,13 +125,13 @@ if __name__ == "__main__":
         # going back on and before date
         dates = get_week_dates(date)
         sleeps = []
-        for date in dates:
-            patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+        for d in dates:
+            patient_date_json = os.path.join(patient_dir, d, "sleep.json")
             if not os.path.exists(patient_date_json):
-                logger.error(f"{date} sleep data not found.")
+                logger.error(f"{d} sleep data not found.")
                 sleeps.append(
                     {
-                        "day": date,
+                        "day": d,
                         "sleep_phase_5_min": "",
                         "bedtime_start": None,
                         "bedtime_end": None,
@@ -114,8 +141,12 @@ if __name__ == "__main__":
                 date_list = read_json(patient_date_json)
                 sleeps.extend(date_list)
         data = SleepData(sleeps)
+        # get summary of today's data
+        if missing_data_on_date(sleeps, date):
+            logger.error(f"Missing data for today {date}")
+        else:
+            data.get_summary_plot_for_date(date)
+
+        # get summary for past week
         data.plot_sleep_distribution_for_week()
         data.plot_sleep_habit_for_week_polar()
-
-        # print(data.plot_sleep_phase_5_min(day))
-        # print(data.get_summary_stat_for_day(day))

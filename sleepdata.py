@@ -11,42 +11,46 @@ import numpy as np
 
 
 class SleepData:
-    def __init__(self, data) -> None:
-        """
+    def __init__(self, data: list) -> None:
+        """Init class
+
         Args:
-            path (str): path to json
+            data (list): list of dicts of sleep info
         """
         # self.data looks like [{}, {}, ..., {}]
         self.data = data
         # self.sleep_data_one_day -> SleepDataOneDay object
         self.sleep_data_one_day = {}
 
-    def get_available_days(self) -> set:
-        """
-        Return all recorded days
+    def get_available_dates(self) -> set:
+        """Return all recorded dates
+
+        Returns:
+            set: set("2023-07-15", "2023-07-16")
         """
         res = set()
         for sleep_chunk in self.data:
             res.add(sleep_chunk["day"])
         return res
 
-    def get_sleep_data_on_day(self, day: str) -> list:
-        """
-        Return a list of sleep data on that day
+    def get_sleep_data_on_date(self, date: str) -> list:
+        """Return a list of sleep data on that day
+
         Args:
-            day: looks like 2023-09-14
+            day (str): "2023-09-14"
+
+        Returns:
+            list: [{}, {}, ...]
         """
         res = []
         for sleep_chunk in self.data:
-            if sleep_chunk["day"] == day:
+            if sleep_chunk["day"] == date:
                 res.append(sleep_chunk)
         return res
 
-    def plot_sleep_interval_on_day(self, ax, day: str) -> None:
-        """
-        Plot sleep intervals on day
-        """
-        sleep_data_on_day = self.get_sleep_data_on_day(day)
+    def plot_sleep_interval_on_date(self, ax, date: str) -> None:
+        """Plot sleep intervals on date"""
+        sleep_data_on_day = self.get_sleep_data_on_date(date)
 
         # Create lists for sleep start and end times
         sleep_start_times = []
@@ -83,14 +87,14 @@ class SleepData:
         ax.set_yticks([])
         ax.set_xlim([all_times[0], all_times[-1]])
         ax.set_ylim(0.5, 1.5)
-        ax.set_title(f"Sleep Intervals for {day}")
+        ax.set_title(f"Sleep Intervals for {date}")
         ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
         # by default it plots in UTC time
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         # Improve layout and show grid
         plt.grid(True)
 
-    def get_summary_stat_for_day(self, day: str) -> pd.DataFrame:
+    def get_summary_stat_for_date(self, day: str) -> pd.DataFrame:
         """
         Get a summary of stats for day
         each row represents a sleep section during the same day
@@ -103,7 +107,7 @@ class SleepData:
             - total_sleep_duration
         format the time such that they are in 00:00:00 format
         """
-        sleep_data_on_day = self.get_sleep_data_on_day(day)
+        sleep_data_on_day = self.get_sleep_data_on_date(day)
         temp = []
         for sleep_chunk in sleep_data_on_day:
             day_chunk = {}
@@ -123,21 +127,21 @@ class SleepData:
             temp.append(day_chunk)
         return pd.DataFrame.from_records(temp)
 
-    def get_summary_plot_for_day(self, day: str):
+    def get_summary_plot_for_date(self, date: str):
         # Create a figure with two subplots
         fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
 
         # Call the first function and pass its ax to the first subplot
-        self.plot_sleep_interval_on_day(axes[0], day)
-        self.plot_sleep_phase_5_min(axes[1], day)
-        self.plot_sleep_distribution_for_day(day)
+        self.plot_sleep_interval_on_date(axes[0], date)
+        self.plot_sleep_phase_5_min(axes[1], date)
+        self.plot_sleep_distribution_for_date(date)
 
         plt.tight_layout()
         plt.gcf().autofmt_xdate()
         plt.show()
 
-    def plot_sleep_phase_5_min(self, ax, day):
-        sleep_data_on_day = self.get_sleep_data_on_day(day)
+    def plot_sleep_phase_5_min(self, ax, date):
+        sleep_data_on_day = self.get_sleep_data_on_date(date)
 
         if ax is None:
             fig, ax = plt.subplots()
@@ -172,14 +176,14 @@ class SleepData:
         ax.legend()
         plt.grid(True)
 
-    def plot_sleep_distribution_for_day(self, day):
+    def plot_sleep_distribution_for_date(self, date):
         """
         Plot the distribution of sleep phase per day
         """
         # Initialize a dictionary to hold percentage data for each sample
         percentage_data = []
 
-        sleep_data_on_day = self.get_sleep_data_on_day(day)
+        sleep_data_on_day = self.get_sleep_data_on_date(date)
 
         # Process each item in data
         for item in sleep_data_on_day:
@@ -518,8 +522,3 @@ class SleepData:
             fontsize=16,
         )
         plt.show()
-
-
-class SleepDataOneDay:
-    def __init__(self) -> None:
-        pass
