@@ -151,6 +151,23 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
     return res
 
 
+def get_attachments(dir: str):
+    """Return a list of paths to files to be attached
+    to the email
+
+
+    Args:
+        dir (str): folder that contains the plots and log
+            files
+    """
+    attachments = []
+    for root, _, files in os.walk(dir):
+        for file in files:
+            if file.endswith(".png") or file.endswith(".log"):
+                attachments.append(os.path.join(root, file))
+    return attachments
+
+
 def main():
     # read config
     config_file = "config.json"
@@ -169,8 +186,8 @@ def main():
     date = "2023-06-27"
 
     # initialize email sender
-    # email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
-    # email_sender.connect()
+    email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
+    email_sender.connect()
 
     for patient in os.listdir(input_dir):
         # locate patient folder
@@ -199,11 +216,21 @@ def main():
         # get summary for past week
         data.plot_sleep_distribution_for_week(patient_out_dir)
         data.plot_sleep_habit_for_week_polar(patient_out_dir)
+        logger.info(
+            f"sleep distribution plot for past week saved to {patient_out_dir}."
+        )
+        logger.info(f"sleep habit plot for past week saved to {patient_out_dir}.")
+
+        # get attachments
+        attachments = get_attachments(patient_out_dir)
 
         # send a single email to recepients
-        # email_body = "Sleep data processed successfully for the past week."
-        # subject = "Sleep Data Processing Successful"
-        # email_sender.send_email(email_recipients, subject, email_body)
+        email_body = "Sleep data processed successfully for the past week. Please see attachments for more detail"
+        subject = "Sleep Data Processing Successful"
+        email_sender.send_email(email_recipients, subject, email_body, attachments)
+        logger.info(f"Email for patient {patient} sent successfully!")
+
+    email_sender.disconnect()
 
 
 if __name__ == "__main__":
