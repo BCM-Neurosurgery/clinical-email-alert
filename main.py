@@ -53,7 +53,7 @@ def setup_logger(name, file_path, level=logging.INFO):
     return logger
 
 
-def get_week_dates(end_date: str) -> list:
+def get_past_week_dates(end_date: str) -> list:
     """Get week dates on and before end_date
 
     Args:
@@ -86,7 +86,7 @@ def get_todays_date() -> str:
     Returns:
         str: e.g. "2024-05-01"
     """
-    today = d.today()
+    today = datetime.today()
     return today.strftime("%Y-%m-%d")
 
 
@@ -120,70 +120,86 @@ def read_config(config_file: str) -> dict:
     return config
 
 
+def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> list:
+    """Merge sleep data based on dates, return a merged list
+
+    Args:
+        week_dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
+        patient_dir (str): patient dir that contains all data,
+            e.g. "./oura/Percept004/"
+        logger (logging.Logger): logger
+
+    Returns:
+        list: [{}, {}, {}, ..., {}]
+    """
+    res = []
+    for date in dates:
+        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+        if not os.path.exists(patient_date_json):
+            logger.error(f"{date} sleep data not found.")
+            res.append(
+                {
+                    "day": date,
+                    "sleep_phase_5_min": "",
+                    "bedtime_start": None,
+                    "bedtime_end": None,
+                }
+            )
+        else:
+            date_list = read_json(patient_date_json)
+            res.extend(date_list)
+    return res
+
+
 def main():
     # read config
     config_file = "config.json"
     config = read_config(config_file)
 
     # set up vars
-    dir = config["dir"]
-    log = config["log"]
+    input_dir = config["input_dir"]
+    output_dir = config["output_dir"]
     email_recipients = config["email_recipients"]
     smtp_server = config["smtp_server"]
     smtp_port = config["smtp_port"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
-    patient = "Percept005"
+    # TODO: for testing purpose,
+    # manually select a date
     date = "2023-06-27"
-
-    # set up logger
-    logger = setup_logger(patient, log)
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
     email_sender.connect()
 
-    # locate patient folder
-    patient_dir = os.path.join(dir, patient)
-    if not os.path.exists(patient_dir):
-        logger.error("Patient Not Found.")
-        email_body = "Patient Not Found."
-        subject = "Error in Processing Sleep Data"
-        email_sender.send_email(email_recipients, subject, email_body)
-        logger.info("Email Sent Successfully")
-    else:
+    for patient in os.listdir(input_dir):
+        # locate patient folder
+        patient_dir = os.path.join(input_dir, patient)
+
+        # set up output dir
+        os.makedirs(os.path.join(output_dir, patient, date), exist_ok=True)
+        log = os.path.join(output_dir, patient, date, "log.log")
+
+        # set up logger
+        logger = setup_logger(patient, log)
+
         # get sleep pattern for the past week
         # going back on and before date
-        dates = get_week_dates(date)
-        sleeps = []
-        for d in dates:
-            patient_date_json = os.path.join(patient_dir, d, "sleep.json")
-            if not os.path.exists(patient_date_json):
-                logger.error(f"{d} sleep data not found.")
-                sleeps.append(
-                    {
-                        "day": d,
-                        "sleep_phase_5_min": "",
-                        "bedtime_start": None,
-                        "bedtime_end": None,
-                    }
-                )
-            else:
-                date_list = read_json(patient_date_json)
-                sleeps.extend(date_list)
+        past_week_dates = get_past_week_dates(date)
+        sleeps = merge_sleep_data(past_week_dates, patient_dir, logger)
         data = SleepData(sleeps)
+
         # get summary of today's data
         if missing_data_on_date(sleeps, date):
             logger.error(f"Missing data for today {date}")
-            email_body = f"Missing data for today {date}"
-            subject = "Error in Processing Sleep Data"
-            email_sender.send_email(email_recipients, subject, email_body)
         else:
             data.get_summary_plot_for_date(date)
 
         # get summary for past week
         data.plot_sleep_distribution_for_week()
         data.plot_sleep_habit_for_week_polar()
+
+        # send a single email to recepients
         email_body = "Sleep data processed successfully for the past week."
         subject = "Sleep Data Processing Successful"
         email_sender.send_email(email_recipients, subject, email_body)
