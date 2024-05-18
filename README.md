@@ -2,9 +2,13 @@
 Repo to store the temporary minimal solution for alerting worrying sleep signs in out TBRD patients
 
 
-### Installation
+### Deploy to Elias
 ```
+ssh auto@10.18.7.74
+cd CODE
 git clone git@github.com:BCM-Neurosurgery/TRBD-null-pipeline.git
+source ~/miniconda3/bin/activate
+conda activate trbdv0
 pip install -e .
 ```
 
