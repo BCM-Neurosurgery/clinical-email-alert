@@ -169,16 +169,17 @@ def main():
     date = "2023-06-27"
 
     # initialize email sender
-    email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
-    email_sender.connect()
+    # email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
+    # email_sender.connect()
 
     for patient in os.listdir(input_dir):
         # locate patient folder
-        patient_dir = os.path.join(input_dir, patient)
+        patient_in_dir = os.path.join(input_dir, patient)
 
         # set up output dir
-        os.makedirs(os.path.join(output_dir, patient, date), exist_ok=True)
-        log = os.path.join(output_dir, patient, date, "log.log")
+        patient_out_dir = os.path.join(output_dir, patient, date)
+        os.makedirs(patient_out_dir, exist_ok=True)
+        log = os.path.join(patient_out_dir, "log.log")
 
         # set up logger
         logger = setup_logger(patient, log)
@@ -186,23 +187,23 @@ def main():
         # get sleep pattern for the past week
         # going back on and before date
         past_week_dates = get_past_week_dates(date)
-        sleeps = merge_sleep_data(past_week_dates, patient_dir, logger)
+        sleeps = merge_sleep_data(past_week_dates, patient_in_dir, logger)
         data = SleepData(sleeps)
 
         # get summary of today's data
         if missing_data_on_date(sleeps, date):
             logger.error(f"Missing data for today {date}")
         else:
-            data.get_summary_plot_for_date(date)
+            data.get_summary_plot_for_date(date, patient_out_dir)
 
         # get summary for past week
-        data.plot_sleep_distribution_for_week()
-        data.plot_sleep_habit_for_week_polar()
+        data.plot_sleep_distribution_for_week(patient_out_dir)
+        data.plot_sleep_habit_for_week_polar(patient_out_dir)
 
         # send a single email to recepients
-        email_body = "Sleep data processed successfully for the past week."
-        subject = "Sleep Data Processing Successful"
-        email_sender.send_email(email_recipients, subject, email_body)
+        # email_body = "Sleep data processed successfully for the past week."
+        # subject = "Sleep Data Processing Successful"
+        # email_sender.send_email(email_recipients, subject, email_body)
 
 
 if __name__ == "__main__":

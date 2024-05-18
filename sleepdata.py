@@ -7,6 +7,7 @@ import pandas as pd
 from collections import Counter
 import numpy as np
 from matplotlib.cm import get_cmap
+import os
 
 # TODO: how to define a day?
 
@@ -128,18 +129,20 @@ class SleepData:
             temp.append(day_chunk)
         return pd.DataFrame.from_records(temp)
 
-    def get_summary_plot_for_date(self, date: str):
+    def get_summary_plot_for_date(self, date: str, out_dir: str):
         # Create a figure with two subplots
         fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
 
         # Call the first function and pass its ax to the first subplot
         self.plot_sleep_interval_on_date(axes[0], date)
         self.plot_sleep_phase_5_min(axes[1], date)
-        self.plot_sleep_distribution_for_date(date)
-
         plt.tight_layout()
         plt.gcf().autofmt_xdate()
-        plt.show()
+        plot_file = os.path.join(out_dir, f"sleep_interval_{date}.png")
+        plt.savefig(plot_file)
+
+        # save the 2nd one independently
+        self.plot_sleep_distribution_for_date(date, out_dir)
 
     def plot_sleep_phase_5_min(self, ax, date):
         sleep_data_on_day = self.get_sleep_data_on_date(date)
@@ -177,7 +180,7 @@ class SleepData:
         ax.legend()
         plt.grid(True)
 
-    def plot_sleep_distribution_for_date(self, date):
+    def plot_sleep_distribution_for_date(self, date, out_dir: str):
         """
         Plot the distribution of sleep phase per day
         """
@@ -247,8 +250,11 @@ class SleepData:
         ax.set_xticks(x_positions + bar_width * (len(phases) - 1) / 2)
         ax.set_xticklabels([f"Section {i+1}" for i in x_positions])
         ax.legend()
+        plot_file = os.path.join(out_dir, f"sleep_distribution_{date}.png")
+        plt.savefig(plot_file)
+        plt.close()
 
-    def plot_sleep_distribution_for_week(self):
+    def plot_sleep_distribution_for_week(self, out_dir: str):
         """
         Plot sleep distribution for the past week ending at day
         """
@@ -337,7 +343,7 @@ class SleepData:
 
         plt.legend(title="Sleep Phases and Averages")
         plt.tight_layout()
-        plt.show()
+        plt.savefig(os.path.join(out_dir, "sleep_distribution_past_week.png"))
 
     def plot_sleep_habit_for_week(self):
         """
@@ -418,7 +424,7 @@ class SleepData:
         plt.tight_layout()
         plt.show()
 
-    def plot_sleep_habit_for_week_polar(self):
+    def plot_sleep_habit_for_week_polar(self, out_dir: str):
         # Convert data into a DataFrame and convert times to datetime
         df = pd.DataFrame(self.data)
         df["bedtime_start"] = pd.to_datetime(df["bedtime_start"])
@@ -519,9 +525,10 @@ class SleepData:
 
         # Title and labels
         plt.title(
-            "Sleep Patterns Over Week",
+            "Sleep Patterns Over Past Week",
             va="bottom",
             family="serif",
             fontsize=16,
         )
-        plt.show()
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, "sleep_habit_past_week.png"))
