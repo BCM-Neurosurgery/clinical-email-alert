@@ -119,7 +119,7 @@ def read_config(config_file: str) -> dict:
     return config
 
 
-if __name__ == "__main__":
+def main():
     # read config
     config_file = "config.json"
     config = read_config(config_file)
@@ -168,3 +168,7 @@ if __name__ == "__main__":
         # get summary for past week
         data.plot_sleep_distribution_for_week()
         data.plot_sleep_habit_for_week_polar()
+
+
+if __name__ == "__main__":
+    main()
