@@ -105,11 +105,29 @@ def missing_data_on_date(sleep_data: list, date: str) -> bool:
     return False
 
 
+def read_config(config_file: str) -> dict:
+    """Read config.json into dict
+
+    Args:
+        config_file (str): path to config file
+
+    Returns:
+        dict: loaded into dictionary
+    """
+    with open(config_file, "r") as file:
+        config = json.load(file)
+    return config
+
+
 if __name__ == "__main__":
+    # read config
+    config_file = "config.json"
+    config = read_config(config_file)
+
     # set up vars
-    dir = "./oura"
+    dir = config["dir"]
+    log = config["log"]
     patient = "Percept004"
-    log = "./example.log"
     date = "2023-06-27"
 
     # set up logger
