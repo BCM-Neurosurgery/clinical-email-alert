@@ -14,6 +14,7 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import json
 import pandas as pd
+from send_email import EmailSender
 
 
 # Custom formatter class to handle timezone
@@ -127,17 +128,29 @@ def main():
     # set up vars
     dir = config["dir"]
     log = config["log"]
-    patient = "Percept004"
+    email_recipients = config["email_recipients"]
+    smtp_server = config["smtp_server"]
+    smtp_port = config["smtp_port"]
+    smtp_user = config["smtp_user"]
+    smtp_password = config["smtp_password"]
+    patient = "Percept005"
     date = "2023-06-27"
 
     # set up logger
     logger = setup_logger(patient, log)
 
+    # initialize email sender
+    email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
+    email_sender.connect()
+
     # locate patient folder
     patient_dir = os.path.join(dir, patient)
     if not os.path.exists(patient_dir):
         logger.error("Patient Not Found.")
-
+        email_body = "Patient Not Found."
+        subject = "Error in Processing Sleep Data"
+        email_sender.send_email(email_recipients, subject, email_body)
+        logger.info("Email Sent Successfully")
     else:
         # get sleep pattern for the past week
         # going back on and before date
@@ -162,12 +175,18 @@ def main():
         # get summary of today's data
         if missing_data_on_date(sleeps, date):
             logger.error(f"Missing data for today {date}")
+            email_body = f"Missing data for today {date}"
+            subject = "Error in Processing Sleep Data"
+            email_sender.send_email(email_recipients, subject, email_body)
         else:
             data.get_summary_plot_for_date(date)
 
         # get summary for past week
         data.plot_sleep_distribution_for_week()
         data.plot_sleep_habit_for_week_polar()
+        email_body = "Sleep data processed successfully for the past week."
+        subject = "Sleep Data Processing Successful"
+        email_sender.send_email(email_recipients, subject, email_body)
 
 
 if __name__ == "__main__":
