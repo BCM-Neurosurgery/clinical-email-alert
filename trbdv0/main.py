@@ -151,6 +151,39 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
     return res
 
 
+def get_missing_dates(dates: list, patient_dir: str) -> list:
+    """Return a list of missing dates in the dates list
+
+    Args:
+        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
+        patient_dir (str): patient dir that contains all data,
+            e.g. "./oura/Percept004/"
+
+    Returns:
+        list: ["2023-06-23", "2023-06-24"]
+    """
+    res = []
+    for date in dates:
+        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+        if not os.path.exists(patient_date_json):
+            res.append(date)
+    return res
+
+
+def generate_email_body(missing_dates, total_days=7):
+    missing_count = len(missing_dates)
+    missing_dates_str = ", ".join(missing_dates)
+
+    email_body = (
+        f"Sleep data processed successfully for the past week.\n\n"
+        f"There are {missing_count} out of {total_days} days with missing data.\n"
+        f"Missing dates: {missing_dates_str}\n\n"
+        f"Please see attachments for more details."
+    )
+
+    return email_body
+
+
 def get_attachments(dir: str):
     """Return a list of paths to files to be attached
     to the email
@@ -183,7 +216,7 @@ def main():
     smtp_password = config["smtp_password"]
     # TODO: for testing purpose,
     # manually select a date
-    date = "2023-06-27"
+    date = get_todays_date()
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
@@ -224,9 +257,11 @@ def main():
         # get attachments
         attachments = get_attachments(patient_out_dir)
 
+        # get non-compliant dates for the past week
+        missing_dates = get_missing_dates(past_week_dates, patient_in_dir)
         # send a single email to recepients
-        email_body = "Sleep data processed successfully for the past week. Please see attachments for more detail"
-        subject = "Sleep Data Processing Successful"
+        email_body = generate_email_body(missing_dates)
+        subject = f"Sleep Data Processing Successful for Patient {patient}"
         email_sender.send_email(email_recipients, subject, email_body, attachments)
         logger.info(f"Email for patient {patient} sent successfully!")
 
