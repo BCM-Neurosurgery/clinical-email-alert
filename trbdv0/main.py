@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import json
 import pandas as pd
 from trbdv0.send_email import EmailSender
+import argparse
 
 
 # Custom formatter class to handle timezone
@@ -201,9 +202,7 @@ def get_attachments(dir: str):
     return attachments
 
 
-def main():
-    # read config
-    config_file = "config.json"
+def main(config_file):
     config = read_config(config_file)
 
     # set up vars
@@ -215,7 +214,6 @@ def main():
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     past_days = config["past_days"]
-    # date = get_todays_date()
     date = get_todays_date()
 
     # initialize email sender
@@ -276,4 +274,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run the notification system.")
+    parser.add_argument(
+        "--config", type=str, default="config.json", help="Path to the config file"
+    )
+    args = parser.parse_args()
+
+    main(args.config)
