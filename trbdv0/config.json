@@ -1,9 +1,0 @@
-{
-    "input_dir": "../oura",
-    "output_dir": "../oura_out",
-    "email_recipients": ["thefirstzyw@hotmail.com"],
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 587,
-    "smtp_user": "trbdv0notify@gmail.com",
-    "smtp_password": "ilsrggfxxeyflpmj "
-}
