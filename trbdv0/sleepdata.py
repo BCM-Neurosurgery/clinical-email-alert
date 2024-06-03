@@ -253,9 +253,9 @@ class SleepData:
         plt.savefig(plot_file)
         plt.close()
 
-    def plot_sleep_distribution_for_week(self, out_dir: str):
+    def plot_sleep_distribution(self, out_dir: str, past_days: int):
         """
-        Plot sleep distribution for the past week ending at day
+        Plot sleep distribution for the past past_days
         """
         sleep_data = {}
 
@@ -342,7 +342,9 @@ class SleepData:
 
         plt.legend(title="Sleep Phases and Averages")
         plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, "sleep_distribution_past_week.png"))
+        plt.savefig(
+            os.path.join(out_dir, f"sleep_distribution_past_{past_days}_days.png")
+        )
 
     def plot_sleep_habit_for_week(self):
         """
@@ -423,7 +425,7 @@ class SleepData:
         plt.tight_layout()
         plt.show()
 
-    def plot_sleep_habit_for_week_polar(self, out_dir: str):
+    def plot_sleep_habit_polar(self, out_dir: str, past_days: int):
         # Convert data into a DataFrame and convert times to datetime
         df = pd.DataFrame(self.data)
         df["bedtime_start"] = pd.to_datetime(df["bedtime_start"])
@@ -524,10 +526,10 @@ class SleepData:
 
         # Title and labels
         plt.title(
-            "Sleep Patterns Over Past Week",
+            f"Sleep Patterns Over Past {past_days} Days",
             va="bottom",
             family="serif",
             fontsize=16,
         )
         plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, "sleep_habit_past_week.png"))
+        plt.savefig(os.path.join(out_dir, f"sleep_habit_past_{past_days}_days.png"))

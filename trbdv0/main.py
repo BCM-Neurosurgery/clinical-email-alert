@@ -53,7 +53,7 @@ def setup_logger(name, file_path, level=logging.INFO):
     return logger
 
 
-def get_past_week_dates(end_date: str) -> list:
+def get_past_week_dates(end_date: str, past_days: int = 7) -> list:
     """Get week dates on and before end_date
 
     Args:
@@ -63,7 +63,7 @@ def get_past_week_dates(end_date: str) -> list:
         list: a list of dates going back for a week on and before end_date
     """
     end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
-    date_list = [end_date_dt - timedelta(days=x) for x in range(7)]
+    date_list = [end_date_dt - timedelta(days=x) for x in range(past_days)]
     return [date.strftime("%Y-%m-%d") for date in date_list]
 
 
@@ -170,12 +170,12 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
     return res
 
 
-def generate_email_body(missing_dates, total_days=7):
+def generate_email_body(missing_dates, total_days=14):
     missing_count = len(missing_dates)
     missing_dates_str = ", ".join(missing_dates)
 
     email_body = (
-        f"Sleep data processed successfully for the past week.\n\n"
+        f"Sleep data processed successfully for the past {total_days} days.\n\n"
         f"There are {missing_count} out of {total_days} days with missing data.\n"
         f"Missing dates: {missing_dates_str}\n\n"
         f"Please see attachments for more details."
@@ -214,17 +214,22 @@ def main():
     smtp_port = config["smtp_port"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
-    # TODO: for testing purpose,
-    # manually select a date
+    past_days = config["past_days"]
+    # date = get_todays_date()
     date = get_todays_date()
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
     email_sender.connect()
 
-    for patient in os.listdir(input_dir):
+    for patient in config["active_patients"]:
         # locate patient folder
         patient_in_dir = os.path.join(input_dir, patient)
+
+        # check if patient folder exists
+        if not os.path.exists(patient_in_dir):
+            logger.error(f"Patient folder {patient_in_dir} does not exist.")
+            continue
 
         # set up output dir
         patient_out_dir = os.path.join(output_dir, patient, date)
@@ -236,7 +241,7 @@ def main():
 
         # get sleep pattern for the past week
         # going back on and before date
-        past_week_dates = get_past_week_dates(date)
+        past_week_dates = get_past_week_dates(date, past_days)
         sleeps = merge_sleep_data(past_week_dates, patient_in_dir, logger)
         data = SleepData(sleeps)
 
@@ -247,12 +252,14 @@ def main():
             data.get_summary_plot_for_date(date, patient_out_dir)
 
         # get summary for past week
-        data.plot_sleep_distribution_for_week(patient_out_dir)
-        data.plot_sleep_habit_for_week_polar(patient_out_dir)
+        data.plot_sleep_distribution(patient_out_dir, past_days)
+        data.plot_sleep_habit_polar(patient_out_dir, past_days)
         logger.info(
-            f"sleep distribution plot for past week saved to {patient_out_dir}."
+            f"sleep distribution plot for past {past_days} days saved to {patient_out_dir}."
         )
-        logger.info(f"sleep habit plot for past week saved to {patient_out_dir}.")
+        logger.info(
+            f"sleep habit plot for past {past_days} days saved to {patient_out_dir}."
+        )
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
@@ -260,7 +267,7 @@ def main():
         # get non-compliant dates for the past week
         missing_dates = get_missing_dates(past_week_dates, patient_in_dir)
         # send a single email to recepients
-        email_body = generate_email_body(missing_dates)
+        email_body = generate_email_body(missing_dates, past_days)
         subject = f"Sleep Data Processing Successful for Patient {patient}"
         email_sender.send_email(email_recipients, subject, email_body, attachments)
         logger.info(f"Email for patient {patient} sent successfully!")
