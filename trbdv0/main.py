@@ -250,25 +250,21 @@ def main(config_file):
             data.get_summary_plot_for_date(date, patient_out_dir)
 
         # get summary for past week
-        data.plot_sleep_distribution(patient_out_dir, past_days)
-        data.plot_sleep_habit_polar(patient_out_dir, past_days)
+        data.plot_combined_sleep_plots(patient_out_dir, past_days)
         logger.info(
-            f"sleep distribution plot for past {past_days} days saved to {patient_out_dir}."
-        )
-        logger.info(
-            f"sleep habit plot for past {past_days} days saved to {patient_out_dir}."
+            f"sleep combined plot for past {past_days} days saved to {patient_out_dir}."
         )
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
 
-        # get non-compliant dates for the past week
-        missing_dates = get_missing_dates(past_week_dates, patient_in_dir)
-        # send a single email to recepients
-        email_body = generate_email_body(missing_dates, past_days)
-        subject = f"Sleep Data Processing Successful for Patient {patient}"
-        email_sender.send_email(email_recipients, subject, email_body, attachments)
-        logger.info(f"Email for patient {patient} sent successfully!")
+        # # get non-compliant dates for the past week
+        # missing_dates = get_missing_dates(past_week_dates, patient_in_dir)
+        # # send a single email to recepients
+        # email_body = generate_email_body(missing_dates, past_days)
+        # subject = f"Sleep Data Processing Successful for Patient {patient}"
+        # email_sender.send_email(email_recipients, subject, email_body, attachments)
+        # logger.info(f"Email for patient {patient} sent successfully!")
 
     email_sender.disconnect()
 

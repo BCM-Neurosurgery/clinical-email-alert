@@ -533,3 +533,214 @@ class SleepData:
         )
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, f"sleep_habit_past_{past_days}_days.png"))
+
+    def plot_combined_sleep_plots(self, out_dir: str, past_days: int):
+        """
+        Plot sleep distribution and sleep habit polar plot side by side.
+        """
+        sleep_data = {}
+
+        for entry in self.data:
+            day = entry["day"]
+            sleep_phases = entry["sleep_phase_5_min"]
+            phase_counts = Counter(sleep_phases)  # Count occurrences of each phase
+
+            if day not in sleep_data:
+                sleep_data[day] = Counter()
+
+            sleep_data[day] += phase_counts
+
+        # Convert counts to hours (assuming each phase count is in 5 minutes increments)
+        for day in sleep_data:
+            for phase in sleep_data[day]:
+                sleep_data[day][phase] = (
+                    sleep_data[day][phase] * 5
+                ) / 60  # Convert to hours
+
+        all_keys = ["1", "2", "3", "4"]
+        flattened_data = {
+            date: {key: sleep_data[date].get(key, np.nan) for key in all_keys}
+            for date in sleep_data
+        }
+        df = pd.DataFrame.from_dict(flattened_data, orient="index")
+        df = df.sort_index(ascending=True)
+        # Rename columns based on sleep phase descriptions
+        phase_mapping = {
+            "1": "Deep Sleep",
+            "2": "Light Sleep",
+            "3": "REM Sleep",
+            "4": "Awake",
+        }
+        df.columns = [phase_mapping.get(col, f"Phase {col}") for col in df.columns]
+
+        # reorder so that awake is at the top
+        column_order = ["Deep Sleep", "Light Sleep", "REM Sleep", "Awake"]
+        df = df[column_order]
+
+        # Create a figure with two subplots
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(26, 10))
+
+        # Plot sleep distribution on the first subplot
+        ax1 = axes[0]
+        color_palette = get_cmap("Set2").colors[:4]
+        ax1 = df.plot(
+            kind="bar",
+            stacked=True,
+            color=color_palette,
+            alpha=0.7,
+            edgecolor="black",
+            ax=ax1,
+        )
+        ax1.set_title("Distribution of Sleep Phases per Day")
+        ax1.set_ylabel("Hours")
+        ax1.set_xlabel("Day")
+        ax1.set_xticks(range(len(df)))
+        ax1.set_xticklabels(df.index, rotation=45)
+
+        # Adding labels to each bar
+        for p in ax1.patches:
+            width, height = p.get_width(), p.get_height()
+            if (
+                height > 0
+            ):  # Only label the bar if the height is significant to avoid clutter
+                x, y = p.get_xy()
+                ax1.text(
+                    x + width / 2,
+                    y + height / 2,
+                    f"{height:.1f}",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+
+        # Calculate total hours of sleep per day, excluding the Awake phase
+        sleep_columns = [
+            "Deep Sleep",
+            "Light Sleep",
+            "REM Sleep",
+        ]  # Only these phases contribute to sleep
+        df["Total Sleep"] = df[sleep_columns].sum(axis=1)
+        average_sleep = df.dropna()["Total Sleep"].mean()
+        ax1.axhline(
+            y=average_sleep,
+            color="r",
+            linestyle="--",
+            label=f"Average Sleep ({average_sleep:.2f} hrs)",
+        )
+
+        ax1.legend(title="Sleep Phases and Averages")
+
+        # Plot sleep habit polar plot on the second subplot
+        df2 = pd.DataFrame(self.data)
+        df2["bedtime_start"] = pd.to_datetime(df2["bedtime_start"])
+        df2["bedtime_end"] = pd.to_datetime(df2["bedtime_end"])
+        df2["day"] = pd.to_datetime(df2["day"])
+
+        df2.sort_values("day", inplace=True)
+
+        ax2 = axes[1]
+        ax2 = fig.add_subplot(122, projection="polar")
+        ax2.set_theta_direction(-1)
+        ax2.set_theta_zero_location("N")
+
+        ax2.set_facecolor("floralwhite")
+        fig.set_facecolor("floralwhite")
+
+        base_radius = 10  # Radius of the innermost circle
+        width = 2
+
+        alpha = 0.75
+        edgecolor = "black"
+        color_palette = get_cmap("Set2").colors[:7]
+
+        unique_days = df2["day"].drop_duplicates().reset_index(drop=True)
+        for index, day in enumerate(unique_days):
+            color = color_palette[index % 7]
+            day_data = df2[df2["day"] == day]
+            radius = base_radius + index * width
+            for _, row in day_data.iterrows():
+                if pd.isna(row["bedtime_start"]) and pd.isna(row["bedtime_end"]):
+                    ax2.barh(
+                        radius,
+                        0,
+                        left=0,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                        edgecolor=edgecolor,
+                    )
+                    continue
+
+                # Convert timezone-aware datetime to the correct number for plotting
+                start_frac = (
+                    row["bedtime_start"] - row["bedtime_start"].normalize()
+                ).total_seconds() / 86400
+                end_frac = (
+                    row["bedtime_end"] - row["bedtime_end"].normalize()
+                ).total_seconds() / 86400
+
+                start_theta = start_frac * 2 * np.pi
+                end_theta = end_frac * 2 * np.pi
+
+                # If bedtime goes over midnight
+                if start_theta > end_theta:
+                    ax2.barh(
+                        radius,
+                        2 * np.pi - start_theta,
+                        left=start_theta,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                        edgecolor=edgecolor,
+                    )
+                    ax2.barh(
+                        radius,
+                        end_theta,
+                        left=0,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                        edgecolor=edgecolor,
+                    )
+                else:
+                    ax2.barh(
+                        radius,
+                        end_theta - start_theta,
+                        left=start_theta,
+                        height=width,
+                        color=color,
+                        alpha=alpha,
+                        edgecolor=edgecolor,
+                    )
+
+        # Create the legend
+        day_labels = [day.strftime("%a %Y-%m-%d") for day in unique_days]
+        handles = [
+            plt.Rectangle((0, 0), 1, 1, color=color_palette[i % 7], alpha=alpha)
+            for i in range(len(unique_days))
+        ]
+        plt.legend(handles, day_labels, loc="upper left", bbox_to_anchor=(1, 1))
+
+        ax2.set_rticks([])  # Hide radial ticks
+        ax2.set_xticks(
+            np.linspace(0, 2 * np.pi, 24, endpoint=False)
+        )  # Set ticks every hour
+        ax2.set_xticklabels(
+            [f"{(i % 24):02d}:00" for i in range(24)]
+        )  # Label every hour
+
+        # Adjust subplot spacing
+        plt.subplots_adjust(wspace=0.4)
+
+        # Title and labels
+        ax2.set_title(
+            f"Sleep Patterns Over Past {past_days} Days",
+            va="bottom",
+            family="serif",
+            fontsize=16,
+        )
+        plt.tight_layout()
+
+        # Save the combined figure
+        plt.savefig(
+            os.path.join(out_dir, f"combined_sleep_plots_past_{past_days}_days.png")
+        )
