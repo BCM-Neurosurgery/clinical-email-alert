@@ -122,10 +122,10 @@ def read_config(config_file: str) -> dict:
 
 
 def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> list:
-    """Merge sleep data based on dates, return a merged list
+    """Merge sleep data based on dates, return a merged list with selected keys
 
     Args:
-        week_dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
+        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
         patient_dir (str): patient dir that contains all data,
             e.g. "./oura/Percept004/"
         logger (logging.Logger): logger
@@ -136,6 +136,8 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
     res = []
     for date in dates:
         patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+        daily_activity_json = os.path.join(patient_dir, date, "daily_activity.json")
+
         if not os.path.exists(patient_date_json):
             logger.error(f"{date} sleep data not found.")
             res.append(
@@ -144,11 +146,44 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
                     "sleep_phase_5_min": "",
                     "bedtime_start": None,
                     "bedtime_end": None,
+                    "class_5_min": "",
+                    "non_wear_time": 0,
+                    "timestamp": "",
                 }
             )
         else:
-            date_list = read_json(patient_date_json)
-            res.extend(date_list)
+            sleep_data = read_json(patient_date_json)
+            activity_data = (
+                read_json(daily_activity_json)
+                if os.path.exists(daily_activity_json)
+                else []
+            )
+
+            for sleep_entry in sleep_data:
+                entry = {
+                    "day": date,
+                    "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", ""),
+                    "bedtime_start": sleep_entry.get("bedtime_start", None),
+                    "bedtime_end": sleep_entry.get("bedtime_end", None),
+                    "class_5_min": "",
+                    "non_wear_time": 0,
+                    "timestamp": "",
+                }
+
+                # Find corresponding activity entry with the same day
+                matching_activity = next(
+                    (
+                        activity
+                        for activity in activity_data
+                        if activity.get("day") == date
+                    ),
+                    {},
+                )
+                entry["class_5_min"] = matching_activity.get("class_5_min", "")
+                entry["non_wear_time"] = matching_activity.get("non_wear_time", 0)
+                entry["timestamp"] = matching_activity.get("timestamp", "")
+
+                res.append(entry)
     return res
 
 

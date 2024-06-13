@@ -550,14 +550,23 @@ class SleepData:
 
             sleep_data[day] += phase_counts
 
+            # Add non_wear_time in hours
+            non_wear_time_seconds = entry.get("non_wear_time", 0)
+            sleep_data[day]["non_wear_time"] = (
+                non_wear_time_seconds / 3600
+            )  # Convert to hours
+
         # Convert counts to hours (assuming each phase count is in 5 minutes increments)
         for day in sleep_data:
             for phase in sleep_data[day]:
-                sleep_data[day][phase] = (
-                    sleep_data[day][phase] * 5
-                ) / 60  # Convert to hours
+                if (
+                    phase != "non_wear_time"
+                ):  # Skip non_wear_time as it's already in hours
+                    sleep_data[day][phase] = (
+                        sleep_data[day][phase] * 5
+                    ) / 60  # Convert to hours
 
-        all_keys = ["1", "2", "3", "4"]
+        all_keys = ["1", "2", "3", "4", "non_wear_time"]
         flattened_data = {
             date: {key: sleep_data[date].get(key, np.nan) for key in all_keys}
             for date in sleep_data
@@ -570,11 +579,18 @@ class SleepData:
             "2": "Light Sleep",
             "3": "REM Sleep",
             "4": "Awake",
+            "non_wear_time": "Non-Wear Time",
         }
         df.columns = [phase_mapping.get(col, f"Phase {col}") for col in df.columns]
 
-        # reorder so that awake is at the top
-        column_order = ["Deep Sleep", "Light Sleep", "REM Sleep", "Awake"]
+        # Reorder so that awake and non-wear time are at the top
+        column_order = [
+            "Deep Sleep",
+            "Light Sleep",
+            "REM Sleep",
+            "Awake",
+            "Non-Wear Time",
+        ]
         df = df[column_order]
 
         # Create a figure with two subplots
@@ -582,7 +598,7 @@ class SleepData:
 
         # Plot sleep distribution on the first subplot
         ax1 = axes[0]
-        color_palette = get_cmap("Set2").colors[:4]
+        color_palette = get_cmap("Set2").colors[:5]
         ax1 = df.plot(
             kind="bar",
             stacked=True,
@@ -612,7 +628,7 @@ class SleepData:
                     verticalalignment="center",
                 )
 
-        # Calculate total hours of sleep per day, excluding the Awake phase
+        # Calculate total hours of sleep per day, excluding the Awake and Non-Wear Time phases
         sleep_columns = [
             "Deep Sleep",
             "Light Sleep",
@@ -712,12 +728,54 @@ class SleepData:
                         edgecolor=edgecolor,
                     )
 
+                class_5_mins = row.get("class_5_min", "")
+                timestamp = row.get("timestamp")
+                if class_5_mins and timestamp:
+                    start_time = pd.to_datetime(timestamp).time()
+                    start_time_seconds = (
+                        start_time.hour * 3600
+                        + start_time.minute * 60
+                        + start_time.second
+                    )
+                    start_offset = start_time_seconds / 86400 * 2 * np.pi
+
+                    # Find continuous non-wear periods
+                    non_wear_periods = []
+                    current_period = None
+                    for i, c in enumerate(class_5_mins):
+                        if c == "0":
+                            if current_period is None:
+                                current_period = [i]
+                        else:
+                            if current_period is not None:
+                                current_period.append(i)
+                                non_wear_periods.append(current_period)
+                                current_period = None
+                    if current_period is not None:
+                        current_period.append(len(class_5_mins))
+                        non_wear_periods.append(current_period)
+
+                    for start, end in non_wear_periods:
+                        start_theta = (start / 288) * 2 * np.pi + start_offset
+                        end_theta = (end / 288) * 2 * np.pi + start_offset
+                        ax2.barh(
+                            radius,
+                            end_theta - start_theta,
+                            left=start_theta,
+                            height=width / 2,  # Half the width for non-wear time
+                            color="white",
+                            alpha=alpha,
+                            edgecolor=edgecolor,
+                        )
         # Create the legend
         day_labels = [day.strftime("%a %Y-%m-%d") for day in unique_days]
         handles = [
             plt.Rectangle((0, 0), 1, 1, color=color_palette[i % 7], alpha=alpha)
             for i in range(len(unique_days))
         ]
+        non_wear_handle = plt.Rectangle((0, 0), 1, 1, color="white", alpha=alpha)
+        handles.append(non_wear_handle)
+        day_labels.append("Non-Wear Time")
         plt.legend(handles, day_labels, loc="upper left", bbox_to_anchor=(1, 1))
 
         ax2.set_rticks([])  # Hide radial ticks
