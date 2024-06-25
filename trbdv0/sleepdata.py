@@ -816,4 +816,5 @@ class SleepData:
 
         return {
             "average_sleep": average_sleep,
+            "sleep_df": df.dropna(),
         }

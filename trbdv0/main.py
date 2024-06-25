@@ -16,6 +16,7 @@ import json
 import pandas as pd
 from trbdv0.send_email import EmailSender
 import argparse
+import numpy as np
 
 
 # Custom formatter class to handle timezone
@@ -206,23 +207,61 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
     return res
 
 
+def generate_subject_line(patient: str, stats: dict, today_date: str) -> str:
+    """Generate email subject line
+
+    Args:
+        patient (str): Patient identifier
+        stats (dict): {"average_sleep": float, "sleep_df":
+            DataFrame with dates as index and "Total Sleep" for each date}
+        today_date (str): Today's date in the format "2024-06-01"
+
+    Returns:
+        str: Subject line of the email
+    """
+    sleep_df = stats.get("sleep_df", pd.DataFrame())
+    yesterday_date = (
+        datetime.strptime(today_date, "%Y-%m-%d") - timedelta(days=1)
+    ).strftime("%Y-%m-%d")
+
+    if sleep_df.empty:
+        status = "[Warning: No Sleep Data]"
+    elif yesterday_date not in sleep_df.index:
+        status = "[Warning: Missing Sleep Data]"
+    elif sleep_df.loc[yesterday_date, "Total Sleep"] < 5:
+        status = "[Warning: Sleep < 5 hours]"
+    else:
+        status = "[All Clear]"
+
+    subject = f"{status} for Patient {patient} on {yesterday_date}"
+    return subject
+
+
 def generate_email_body(missing_dates, total_days, stats) -> str:
     """Generate email body
 
     Args:
         missing_dates (list): ["2024-06-01", ...]
         total_days (int): number of total days
-        stats (dict): {"average_sleep": 6.1}
+        stats (dict): {"average_sleep": float, "sleep_df":
+            DataFrame with dates as index and "Total Sleep" for each date}
 
     Returns:
         str: a string of email body
     """
     missing_count = len(missing_dates)
 
+    sleep_df = stats.get("sleep_df", pd.DataFrame())
+    if sleep_df.empty:
+        low_sleep_days = np.nan
+    else:
+        low_sleep_days = (sleep_df["Total Sleep"] < 5).sum()
+
     df = pd.DataFrame(
         {
             "Average Sleep (hours)": [stats["average_sleep"]],
             "Non-Compliance Days": [missing_count],
+            "Days with < 5 hours Sleep": [low_sleep_days],
         }
     )
 
@@ -279,7 +318,8 @@ def main(config_file):
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     num_past_days = config["past_days"]
-    today_date = get_todays_date()
+    # today_date = get_todays_date()
+    today_date = "2024-06-05"
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
@@ -319,7 +359,7 @@ def main(config_file):
         missing_dates = get_missing_dates(past_dates, patient_in_dir)
         # send a single email to recepients
         email_body = generate_email_body(missing_dates, num_past_days, stats)
-        subject = f"Sleep Data Processing Successful for Patient {patient}"
+        subject = generate_subject_line(patient, stats, today_date)
         email_sender.send_email(email_recipients, subject, email_body, attachments)
         logger.info(f"Email for patient {patient} sent successfully!")
 
