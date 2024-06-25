@@ -54,7 +54,7 @@ def setup_logger(name, file_path, level=logging.INFO):
     return logger
 
 
-def get_past_week_dates(end_date: str, past_days: int = 7) -> list:
+def get_past_dates(end_date: str, past_days: int = 7) -> list:
     """Get week dates on and before end_date
 
     Args:
@@ -64,7 +64,7 @@ def get_past_week_dates(end_date: str, past_days: int = 7) -> list:
         list: a list of dates going back for a week on and before end_date
     """
     end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
-    date_list = [end_date_dt - timedelta(days=x) for x in range(past_days)]
+    date_list = [end_date_dt - timedelta(days=x) for x in range(1, past_days + 1)]
     return [date.strftime("%Y-%m-%d") for date in date_list]
 
 
@@ -248,8 +248,8 @@ def main(config_file):
     smtp_port = config["smtp_port"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
-    past_days = config["past_days"]
-    date = get_todays_date()
+    num_past_days = config["past_days"]
+    today_date = get_todays_date()
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
@@ -265,38 +265,30 @@ def main(config_file):
             continue
 
         # set up output dir
-        patient_out_dir = os.path.join(output_dir, patient, date)
+        patient_out_dir = os.path.join(output_dir, patient, today_date)
         os.makedirs(patient_out_dir, exist_ok=True)
         log = os.path.join(patient_out_dir, "log.log")
 
         # set up logger
         logger = setup_logger(patient, log)
 
-        # get sleep pattern for the past week
-        # going back on and before date
-        past_week_dates = get_past_week_dates(date, past_days)
-        sleeps = merge_sleep_data(past_week_dates, patient_in_dir, logger)
+        past_dates = get_past_dates(today_date, num_past_days)
+        sleeps = merge_sleep_data(past_dates, patient_in_dir, logger)
         data = SleepData(sleeps)
 
-        # get summary of today's data
-        if missing_data_on_date(sleeps, date):
-            logger.error(f"Missing data for today {date}")
-        else:
-            data.get_summary_plot_for_date(date, patient_out_dir)
-
-        # get summary for past week
-        data.plot_combined_sleep_plots(patient_out_dir, past_days)
+        # get summary for past x days
+        data.plot_combined_sleep_plots(patient_out_dir)
         logger.info(
-            f"sleep combined plot for past {past_days} days saved to {patient_out_dir}."
+            f"sleep combined plot for past {num_past_days} days saved to {patient_out_dir}."
         )
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
 
-        # get non-compliant dates for the past week
-        missing_dates = get_missing_dates(past_week_dates, patient_in_dir)
+        # get non-compliant dates for the past x days
+        missing_dates = get_missing_dates(past_dates, patient_in_dir)
         # send a single email to recepients
-        email_body = generate_email_body(missing_dates, past_days)
+        email_body = generate_email_body(missing_dates, num_past_days)
         subject = f"Sleep Data Processing Successful for Patient {patient}"
         email_sender.send_email(email_recipients, subject, email_body, attachments)
         logger.info(f"Email for patient {patient} sent successfully!")

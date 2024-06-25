@@ -22,6 +22,10 @@ class SleepData:
         self.data = data
         # self.sleep_data_one_day -> SleepDataOneDay object
         self.sleep_data_one_day = {}
+        self.num_past_days = len(self.data)
+
+    def get_num_past_days(self):
+        return self.num_past_days
 
     def get_available_dates(self) -> set:
         """Return all recorded dates
@@ -425,7 +429,7 @@ class SleepData:
         plt.tight_layout()
         plt.show()
 
-    def plot_sleep_habit_polar(self, out_dir: str, past_days: int):
+    def plot_sleep_habit_polar(self, out_dir: str):
         # Convert data into a DataFrame and convert times to datetime
         df = pd.DataFrame(self.data)
         df["bedtime_start"] = pd.to_datetime(df["bedtime_start"])
@@ -526,15 +530,19 @@ class SleepData:
 
         # Title and labels
         plt.title(
-            f"Sleep Patterns Over Past {past_days} Days",
+            f"Sleep Patterns Over Past {self.get_num_past_days()} Days",
             va="bottom",
             family="serif",
             fontsize=16,
         )
         plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, f"sleep_habit_past_{past_days}_days.png"))
+        plt.savefig(
+            os.path.join(
+                out_dir, f"sleep_habit_past_{self.get_num_past_days()}_days.png"
+            )
+        )
 
-    def plot_combined_sleep_plots(self, out_dir: str, past_days: int):
+    def plot_combined_sleep_plots(self, out_dir: str):
         """
         Plot sleep distribution and sleep habit polar plot side by side.
         """
@@ -791,7 +799,7 @@ class SleepData:
 
         # Title and labels
         ax2.set_title(
-            f"Sleep Patterns Over Past {past_days} Days",
+            f"Sleep Patterns Over Past {self.get_num_past_days()} Days",
             va="bottom",
             family="serif",
             fontsize=16,
@@ -800,5 +808,12 @@ class SleepData:
 
         # Save the combined figure
         plt.savefig(
-            os.path.join(out_dir, f"combined_sleep_plots_past_{past_days}_days.png")
+            os.path.join(
+                out_dir,
+                f"combined_sleep_plots_past_{self.get_num_past_days()}_days.png",
+            )
         )
+
+        return {
+            "average_sleep": average_sleep,
+        }
