@@ -279,8 +279,7 @@ def main(config_file):
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     num_past_days = config["past_days"]
-    # today_date = get_todays_date()
-    today_date = "2024-06-06"
+    today_date = get_todays_date()
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
