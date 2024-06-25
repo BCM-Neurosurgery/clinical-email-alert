@@ -33,7 +33,7 @@ class EmailSender:
         msg["To"] = ", ".join(to_addrs)
         msg["Subject"] = subject
 
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(body, "html"))
 
         if attachments:
             for file in attachments:

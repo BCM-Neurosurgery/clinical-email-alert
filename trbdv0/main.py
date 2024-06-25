@@ -206,16 +206,46 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
     return res
 
 
-def generate_email_body(missing_dates, total_days=14):
-    missing_count = len(missing_dates)
-    missing_dates_str = ", ".join(missing_dates)
+def generate_email_body(missing_dates, total_days, stats) -> str:
+    """Generate email body
 
-    email_body = (
-        f"Sleep data processed successfully for the past {total_days} days.\n\n"
-        f"There are {missing_count} out of {total_days} days with missing data.\n"
-        f"Missing dates: {missing_dates_str}\n\n"
-        f"Please see attachments for more details."
+    Args:
+        missing_dates (list): ["2024-06-01", ...]
+        total_days (int): number of total days
+        stats (dict): {"average_sleep": 6.1}
+
+    Returns:
+        str: a string of email body
+    """
+    missing_count = len(missing_dates)
+
+    df = pd.DataFrame(
+        {
+            "Average Sleep (hours)": [stats["average_sleep"]],
+            "Non-Compliance Days": [missing_count],
+        }
     )
+
+    # Convert DataFrame to HTML table with borders
+    df_html = df.to_html(index=False, border=1, justify="center")
+
+    # Create missing dates section
+    missing_dates_html = "<br>".join(missing_dates)
+    missing_dates_section = f"""
+    <p>Missing Dates:</p>
+    <p>{missing_dates_html}</p>
+    """
+
+    email_body = f"""
+    <html>
+        <body>
+            <p>Sleep data processed successfully for the past {total_days} days.</p>
+            {df_html}
+            {missing_dates_section}
+            <p>Please see attachments for more details.</p>
+        </body>
+    </html>
+    """
 
     return email_body
 
@@ -249,7 +279,8 @@ def main(config_file):
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     num_past_days = config["past_days"]
-    today_date = get_todays_date()
+    # today_date = get_todays_date()
+    today_date = "2024-06-06"
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
@@ -277,7 +308,7 @@ def main(config_file):
         data = SleepData(sleeps)
 
         # get summary for past x days
-        data.plot_combined_sleep_plots(patient_out_dir)
+        stats = data.plot_combined_sleep_plots(patient_out_dir)
         logger.info(
             f"sleep combined plot for past {num_past_days} days saved to {patient_out_dir}."
         )
@@ -288,7 +319,7 @@ def main(config_file):
         # get non-compliant dates for the past x days
         missing_dates = get_missing_dates(past_dates, patient_in_dir)
         # send a single email to recepients
-        email_body = generate_email_body(missing_dates, num_past_days)
+        email_body = generate_email_body(missing_dates, num_past_days, stats)
         subject = f"Sleep Data Processing Successful for Patient {patient}"
         email_sender.send_email(email_recipients, subject, email_body, attachments)
         logger.info(f"Email for patient {patient} sent successfully!")
