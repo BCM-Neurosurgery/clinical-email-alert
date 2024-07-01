@@ -549,11 +549,17 @@ class SleepData:
         os.makedirs(output_dir, exist_ok=True)
 
         dataframe = pd.DataFrame(self.data)
-        # Convert columns to datetime
+        # Convert columns to datetime without time zone information
         dataframe["day"] = pd.to_datetime(dataframe["day"])
-        dataframe["bedtime_start"] = pd.to_datetime(dataframe["bedtime_start"])
-        dataframe["bedtime_end"] = pd.to_datetime(dataframe["bedtime_end"])
+        # Remove timezone information and convert to datetime
+        dataframe["bedtime_start"] = pd.to_datetime(
+            dataframe["bedtime_start"].str.slice(0, 19)
+        )
+        dataframe["bedtime_end"] = pd.to_datetime(
+            dataframe["bedtime_end"].str.slice(0, 19)
+        )
 
+        # Normalize the days to a starting day (e.g., 0)
         min_day = dataframe["day"].min()
         dataframe["day_offset"] = (dataframe["day"] - min_day).dt.days
 
@@ -623,8 +629,8 @@ class SleepData:
                     r=entry["r"],
                     theta=entry["theta"],
                     mode="lines",
-                    line=dict(color=entry["color"], width=2),
-                    showlegend=False,
+                    line=dict(color=entry["color"], width=4),
+                    showlegend=True,
                 )
             )
 
@@ -639,6 +645,8 @@ class SleepData:
                         f'{i % 12 if i % 12 != 0 else 12}{"AM" if i < 12 else "PM"}'
                         for i in range(24)
                     ],
+                    direction="clockwise",
+                    rotation=90,  # Rotate to place 12 AM at the top
                 ),
                 radialaxis=dict(
                     tickmode="array",
