@@ -7,6 +7,8 @@ from collections import Counter
 import numpy as np
 from matplotlib.cm import get_cmap
 import os
+import plotly.express as px
+import plotly.graph_objects as go
 
 # TODO: how to define a day?
 
@@ -541,6 +543,119 @@ class SleepData:
                 out_dir, f"sleep_habit_past_{self.get_num_past_days()}_days.png"
             )
         )
+
+    def create_spiral_plot(self, output_dir, file_name="spiral_plot.png"):
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        dataframe = pd.DataFrame(self.data)
+        # Convert columns to datetime
+        dataframe["day"] = pd.to_datetime(dataframe["day"])
+        dataframe["bedtime_start"] = pd.to_datetime(dataframe["bedtime_start"])
+        dataframe["bedtime_end"] = pd.to_datetime(dataframe["bedtime_end"])
+
+        min_day = dataframe["day"].min()
+        dataframe["day_offset"] = (dataframe["day"] - min_day).dt.days
+
+        spiral_data = []
+        max_radius = dataframe["day_offset"].max() + 1
+
+        for index, row in dataframe.iterrows():
+            day_offset = row["day_offset"]
+            bedtime_start = row["bedtime_start"]
+            bedtime_end = row["bedtime_end"]
+
+            # Calculate angles for bedtime start and end
+            start_angle = (
+                (bedtime_start.hour * 60 + bedtime_start.minute) / 1440 * 2 * np.pi
+            )
+            end_angle = (bedtime_end.hour * 60 + bedtime_end.minute) / 1440 * 2 * np.pi
+
+            if end_angle < start_angle:
+                end_angle += 2 * np.pi  # Adjust for wrapping around the next day
+
+            # Calculate radii for each angle
+            start_radius = day_offset + start_angle / (2 * np.pi)
+            end_radius = day_offset + end_angle / (2 * np.pi)
+
+            # Generate the angles and radii for awake and sleep times
+            awake_angles_before_sleep = np.linspace(
+                2 * np.pi * day_offset, start_angle + 2 * np.pi * day_offset, 100
+            )
+            awake_radii_before_sleep = np.linspace(day_offset, start_radius, 100)
+
+            awake_angles_after_sleep = np.linspace(
+                end_angle + 2 * np.pi * day_offset, 2 * np.pi * (day_offset + 1), 100
+            )
+            awake_radii_after_sleep = np.linspace(end_radius, day_offset + 1, 100)
+
+            sleep_angles = np.linspace(
+                start_angle + 2 * np.pi * day_offset,
+                end_angle + 2 * np.pi * day_offset,
+                100,
+            )
+            sleep_radii = np.linspace(start_radius, end_radius, 100)
+
+            spiral_data.append(
+                dict(
+                    theta=np.degrees(awake_angles_before_sleep),
+                    r=awake_radii_before_sleep,
+                    color="lightgrey",
+                )
+            )
+            spiral_data.append(
+                dict(
+                    theta=np.degrees(awake_angles_after_sleep),
+                    r=awake_radii_after_sleep,
+                    color="lightgrey",
+                )
+            )
+            spiral_data.append(
+                dict(theta=np.degrees(sleep_angles), r=sleep_radii, color="blue")
+            )
+
+        # Create plot
+        fig = go.Figure()
+
+        for entry in spiral_data:
+            fig.add_trace(
+                go.Scatterpolar(
+                    r=entry["r"],
+                    theta=entry["theta"],
+                    mode="lines",
+                    line=dict(color=entry["color"], width=2),
+                    showlegend=False,
+                )
+            )
+
+        # Update layout
+        fig.update_layout(
+            polar=dict(
+                angularaxis=dict(
+                    type="linear",
+                    tickmode="array",
+                    tickvals=np.arange(0, 360, 30),
+                    ticktext=[
+                        f'{i % 12 if i % 12 != 0 else 12}{"AM" if i < 12 else "PM"}'
+                        for i in range(24)
+                    ],
+                ),
+                radialaxis=dict(
+                    tickmode="array",
+                    tickvals=np.arange(0, max_radius + 1),
+                    ticktext=[
+                        (min_day + pd.Timedelta(days=i)).strftime("%b %d")
+                        for i in range(max_radius + 1)
+                    ],
+                ),
+            ),
+            showlegend=False,
+        )
+
+        # Save and show plot
+        plot_path = os.path.join(output_dir, file_name)
+        fig.write_image(plot_path)
+        fig.show()
 
     def plot_combined_sleep_plots(self, out_dir: str):
         """
