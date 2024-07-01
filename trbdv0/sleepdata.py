@@ -630,7 +630,7 @@ class SleepData:
                     theta=entry["theta"],
                     mode="lines",
                     line=dict(color=entry["color"], width=4),
-                    showlegend=True,
+                    showlegend=False,
                 )
             )
 
@@ -649,6 +649,8 @@ class SleepData:
                     rotation=90,  # Rotate to place 12 AM at the top
                 ),
                 radialaxis=dict(
+                    showline=False,
+                    showgrid=False,
                     tickmode="array",
                     tickvals=np.arange(0, max_radius + 1),
                     ticktext=[
