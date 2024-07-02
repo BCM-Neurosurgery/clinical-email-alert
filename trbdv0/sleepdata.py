@@ -9,6 +9,8 @@ from matplotlib.cm import get_cmap
 import os
 import plotly.express as px
 import plotly.graph_objects as go
+import pytz
+import matplotlib.colors as mcolors
 
 # TODO: how to define a day?
 
@@ -548,9 +550,7 @@ class SleepData:
         os.makedirs(output_dir, exist_ok=True)
 
         dataframe = pd.DataFrame(self.data)
-        # Convert columns to datetime without time zone information
         dataframe["day"] = pd.to_datetime(dataframe["day"])
-        # Remove timezone information and convert to datetime
         dataframe["bedtime_start"] = pd.to_datetime(
             dataframe["bedtime_start"].str.slice(0, 19)
         )
@@ -558,19 +558,21 @@ class SleepData:
             dataframe["bedtime_end"].str.slice(0, 19)
         )
 
-        # Normalize the days to a starting day (e.g., 0)
         min_day = dataframe["day"].min()
         dataframe["day_offset"] = (dataframe["day"] - min_day).dt.days
 
-        # Define a color map for different days
-        colors = px.colors.qualitative.Plotly
+        colors = list(mcolors.TABLEAU_COLORS.values())
         day_colors = {
             day: colors[i % len(colors)]
             for i, day in enumerate(dataframe["day"].unique())
         }
 
-        spiral_data = []
-        max_radius = dataframe["day_offset"].max() + 1
+        fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(10, 10))
+        ax.set_theta_direction(-1)
+        ax.set_theta_offset(np.pi / 2.0)
+        ax.set_xticks(np.linspace(0, 2 * np.pi, 24, endpoint=False))
+        ax.set_xticklabels([f"{i}:00" for i in range(24)])
+        ax.set_yticklabels([])
 
         for index, row in dataframe.iterrows():
             day_offset = row["day_offset"]
@@ -578,20 +580,17 @@ class SleepData:
             bedtime_end = row["bedtime_end"]
             day_color = day_colors[row["day"]]
 
-            # Calculate angles for bedtime start and end
             start_angle = (
                 (bedtime_start.hour * 60 + bedtime_start.minute) / 1440 * 2 * np.pi
             )
             end_angle = (bedtime_end.hour * 60 + bedtime_end.minute) / 1440 * 2 * np.pi
 
             if end_angle < start_angle:
-                end_angle += 2 * np.pi  # Adjust for wrapping around the next day
+                end_angle += 2 * np.pi
 
-            # Calculate radii for each angle
             start_radius = day_offset + start_angle / (2 * np.pi)
             end_radius = day_offset + end_angle / (2 * np.pi)
 
-            # Generate the angles and radii for awake and sleep times
             awake_angles_before_sleep = np.linspace(
                 2 * np.pi * day_offset, start_angle + 2 * np.pi * day_offset, 100
             )
@@ -609,71 +608,24 @@ class SleepData:
             )
             sleep_radii = np.linspace(start_radius, end_radius, 100)
 
-            spiral_data.append(
-                dict(
-                    theta=np.degrees(awake_angles_before_sleep),
-                    r=awake_radii_before_sleep,
-                    color="lightgrey",
-                    showlegend=False,
-                )
+            ax.plot(
+                awake_angles_before_sleep, awake_radii_before_sleep, color="lightgrey"
             )
-            spiral_data.append(
-                dict(
-                    theta=np.degrees(awake_angles_after_sleep),
-                    r=awake_radii_after_sleep,
-                    color="lightgrey",
-                    showlegend=False,
-                )
+            ax.plot(
+                awake_angles_after_sleep, awake_radii_after_sleep, color="lightgrey"
             )
-            spiral_data.append(
-                dict(
-                    theta=np.degrees(sleep_angles),
-                    r=sleep_radii,
-                    color=day_color,
-                    name=str(row["day"].date()),
-                    showlegend=True,
-                )
+            ax.plot(
+                sleep_angles,
+                sleep_radii,
+                color=day_color,
+                linewidth=2,
+                label=str(row["day"].date()),
             )
 
-        # Create plot
-        fig = go.Figure()
-
-        for entry in spiral_data:
-            fig.add_trace(
-                go.Scatterpolar(
-                    r=entry["r"],
-                    theta=entry["theta"],
-                    mode="lines",
-                    line=dict(color=entry["color"], width=4),
-                    name=entry.get("name", None),
-                    showlegend=entry.get("showlegend", False),
-                )
-            )
-
-        # Update layout
-        fig.update_layout(
-            polar=dict(
-                angularaxis=dict(
-                    type="linear",
-                    tickmode="array",
-                    tickvals=np.arange(0, 360, 15),
-                    ticktext=[f"{i}:00" for i in range(0, 24)],
-                    direction="clockwise",
-                    rotation=90,
-                ),
-                radialaxis=dict(
-                    showline=False,
-                    showgrid=False,
-                    tickvals=[],
-                ),
-            ),
-            showlegend=True,
-        )
-
-        # Save and show plot
+        ax.legend()
         plot_path = os.path.join(output_dir, file_name)
-        fig.write_image(plot_path)
-        fig.show()
+        plt.savefig(plot_path)
+        plt.show()
 
     def plot_combined_sleep_plots(self, out_dir: str):
         """
