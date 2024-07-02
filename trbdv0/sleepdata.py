@@ -648,11 +648,19 @@ class SleepData:
         # Custom legend
         from matplotlib.lines import Line2D
 
+        # Custom legend
         custom_lines = [
-            Line2D([0], [0], color="black", lw=2, linestyle="-"),
-            Line2D([0], [0], color="black", lw=2, linestyle="--"),
+            Line2D([0], [0], color="lightgray", lw=2, linestyle="--"),
+        ] + [
+            Line2D([0], [0], color=day_colors[day], lw=2, linestyle="-")
+            for day in dataframe["day"].unique()
         ]
-        ax.legend(custom_lines, ["Sleep Period", "Awake Period"])
+        custom_labels = ["Awake Period"] + [
+            f"{day.date()}" for day in dataframe["day"].unique()
+        ]
+        ax.legend(
+            custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1.05, 1)
+        )
         plot_path = os.path.join(output_dir, file_name)
         plt.savefig(plot_path)
         plt.show()
