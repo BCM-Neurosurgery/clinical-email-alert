@@ -577,17 +577,9 @@ class SleepData:
         ax.grid(False)
         ax.xaxis.grid(True, color="black", linestyle="-", linewidth=0.5, alpha=0.8)
 
-        for index, row in dataframe.iterrows():
-            bedtime_start = row["bedtime_start"]
-            bedtime_end = row["bedtime_end"]
-            day_color = day_colors[row["day"]]
-
-            start_offset = (bedtime_start.date() - min_day).days
-
-            start_angle = (
-                (bedtime_start.hour * 60 + bedtime_start.minute) / 1440 * 2 * np.pi
-            )
-            end_angle = (bedtime_end.hour * 60 + bedtime_end.minute) / 1440 * 2 * np.pi
+        def plot_period(start_time, end_time, start_offset, color, linestyle="-"):
+            start_angle = (start_time.hour * 60 + start_time.minute) / 1440 * 2 * np.pi
+            end_angle = (end_time.hour * 60 + end_time.minute) / 1440 * 2 * np.pi
 
             if end_angle < start_angle:
                 end_angle += 2 * np.pi
@@ -602,9 +594,65 @@ class SleepData:
             )
             radii = np.linspace(start_radius, end_radius, 100)
 
-            ax.plot(angles, radii, color=day_color, linewidth=2)
+            ax.plot(angles, radii, color=color, linewidth=2, linestyle=linestyle)
 
-        ax.legend()
+        dataframe = dataframe.sort_values(by="bedtime_start")
+
+        for index in range(len(dataframe)):
+            row = dataframe.iloc[index]
+            bedtime_start = row["bedtime_start"]
+            bedtime_end = row["bedtime_end"]
+            day_color = day_colors[row["day"]]
+
+            start_offset = (bedtime_start.date() - min_day).days
+
+            # Plot sleep period
+            plot_period(bedtime_start, bedtime_end, start_offset, day_color)
+
+            # Plot awake period if not the last row
+            if index < len(dataframe) - 1:
+                next_row = dataframe.iloc[index + 1]
+                next_bedtime_start = next_row["bedtime_start"]
+                awake_start = bedtime_end
+                awake_end = next_bedtime_start
+                awake_start_offset = (awake_start.date() - min_day).days
+
+                if awake_start.date() == awake_end.date():
+                    plot_period(
+                        awake_start,
+                        awake_end,
+                        awake_start_offset,
+                        "lightgray",
+                        linestyle="--",
+                    )
+                else:
+                    # Awake period spans multiple days
+                    midnight = awake_start.replace(hour=23, minute=59, second=59)
+                    plot_period(
+                        awake_start,
+                        midnight,
+                        awake_start_offset,
+                        "lightgray",
+                        linestyle="--",
+                    )
+                    next_start_offset = (awake_end.date() - min_day).days
+                    next_midnight = awake_end.replace(hour=0, minute=0, second=0)
+                    plot_period(
+                        next_midnight,
+                        awake_end,
+                        next_start_offset,
+                        "lightgray",
+                        linestyle="--",
+                    )
+
+        # Custom legend
+        from matplotlib.lines import Line2D
+
+        custom_lines = [
+            Line2D([0], [0], color="black", lw=2, linestyle="-"),
+            Line2D([0], [0], color="black", lw=2, linestyle="--"),
+        ]
+        ax.legend(custom_lines, ["Sleep Period", "Awake Period"])
         plot_path = os.path.join(output_dir, file_name)
         plt.savefig(plot_path)
         plt.show()
