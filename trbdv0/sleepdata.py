@@ -558,8 +558,8 @@ class SleepData:
             dataframe["bedtime_end"].str.slice(0, 19)
         )
 
-        min_day = dataframe["day"].min()
-        dataframe["day_offset"] = (dataframe["day"] - min_day).dt.days
+        # Find the minimum date from bedtime_start
+        min_day = dataframe["bedtime_start"].dt.date.min()
 
         colors = list(mcolors.TABLEAU_COLORS.values())
         day_colors = {
@@ -575,10 +575,11 @@ class SleepData:
         ax.set_yticklabels([])
 
         for index, row in dataframe.iterrows():
-            day_offset = row["day_offset"]
             bedtime_start = row["bedtime_start"]
             bedtime_end = row["bedtime_end"]
             day_color = day_colors[row["day"]]
+
+            start_offset = (bedtime_start.date() - min_day).days
 
             start_angle = (
                 (bedtime_start.hour * 60 + bedtime_start.minute) / 1440 * 2 * np.pi
@@ -588,39 +589,17 @@ class SleepData:
             if end_angle < start_angle:
                 end_angle += 2 * np.pi
 
-            start_radius = day_offset + start_angle / (2 * np.pi)
-            end_radius = day_offset + end_angle / (2 * np.pi)
+            start_radius = start_offset + start_angle / (2 * np.pi)
+            end_radius = start_offset + end_angle / (2 * np.pi)
 
-            awake_angles_before_sleep = np.linspace(
-                2 * np.pi * day_offset, start_angle + 2 * np.pi * day_offset, 100
-            )
-            awake_radii_before_sleep = np.linspace(day_offset, start_radius, 100)
-
-            awake_angles_after_sleep = np.linspace(
-                end_angle + 2 * np.pi * day_offset, 2 * np.pi * (day_offset + 1), 100
-            )
-            awake_radii_after_sleep = np.linspace(end_radius, day_offset + 1, 100)
-
-            sleep_angles = np.linspace(
-                start_angle + 2 * np.pi * day_offset,
-                end_angle + 2 * np.pi * day_offset,
+            angles = np.linspace(
+                start_angle + 2 * np.pi * start_offset,
+                end_angle + 2 * np.pi * start_offset,
                 100,
             )
-            sleep_radii = np.linspace(start_radius, end_radius, 100)
+            radii = np.linspace(start_radius, end_radius, 100)
 
-            ax.plot(
-                awake_angles_before_sleep, awake_radii_before_sleep, color="lightgrey"
-            )
-            ax.plot(
-                awake_angles_after_sleep, awake_radii_after_sleep, color="lightgrey"
-            )
-            ax.plot(
-                sleep_angles,
-                sleep_radii,
-                color=day_color,
-                linewidth=2,
-                label=str(row["day"].date()),
-            )
+            ax.plot(angles, radii, color=day_color, linewidth=2)
 
         ax.legend()
         plot_path = os.path.join(output_dir, file_name)
