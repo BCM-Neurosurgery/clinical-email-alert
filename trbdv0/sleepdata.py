@@ -545,7 +545,6 @@ class SleepData:
         )
 
     def create_spiral_plot(self, output_dir, file_name="spiral_plot.png"):
-        # Ensure the output directory exists
         os.makedirs(output_dir, exist_ok=True)
 
         dataframe = pd.DataFrame(self.data)
@@ -657,13 +656,10 @@ class SleepData:
                 angularaxis=dict(
                     type="linear",
                     tickmode="array",
-                    tickvals=np.arange(0, 360, 30),
-                    ticktext=[
-                        f'{i % 12 if i % 12 != 0 else 12}{"AM" if i < 12 else "PM"}'
-                        for i in range(24)
-                    ],
+                    tickvals=np.arange(0, 360, 15),
+                    ticktext=[f"{i}:00" for i in range(0, 24)],
                     direction="clockwise",
-                    rotation=90,  # Rotate to place 12 AM at the top
+                    rotation=90,
                 ),
                 radialaxis=dict(
                     showline=False,
