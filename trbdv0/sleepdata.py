@@ -574,6 +574,9 @@ class SleepData:
         ax.set_xticklabels([f"{i}:00" for i in range(24)])
         ax.set_yticklabels([])
 
+        ax.grid(False)
+        ax.xaxis.grid(True, color="black", linestyle="-", linewidth=0.5, alpha=0.8)
+
         for index, row in dataframe.iterrows():
             bedtime_start = row["bedtime_start"]
             bedtime_end = row["bedtime_end"]
