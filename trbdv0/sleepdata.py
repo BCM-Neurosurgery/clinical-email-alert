@@ -563,6 +563,13 @@ class SleepData:
         min_day = dataframe["day"].min()
         dataframe["day_offset"] = (dataframe["day"] - min_day).dt.days
 
+        # Define a color map for different days
+        colors = px.colors.qualitative.Plotly
+        day_colors = {
+            day: colors[i % len(colors)]
+            for i, day in enumerate(dataframe["day"].unique())
+        }
+
         spiral_data = []
         max_radius = dataframe["day_offset"].max() + 1
 
@@ -570,6 +577,7 @@ class SleepData:
             day_offset = row["day_offset"]
             bedtime_start = row["bedtime_start"]
             bedtime_end = row["bedtime_end"]
+            day_color = day_colors[row["day"]]
 
             # Calculate angles for bedtime start and end
             start_angle = (
@@ -607,6 +615,7 @@ class SleepData:
                     theta=np.degrees(awake_angles_before_sleep),
                     r=awake_radii_before_sleep,
                     color="lightgrey",
+                    showlegend=False,
                 )
             )
             spiral_data.append(
@@ -614,10 +623,17 @@ class SleepData:
                     theta=np.degrees(awake_angles_after_sleep),
                     r=awake_radii_after_sleep,
                     color="lightgrey",
+                    showlegend=False,
                 )
             )
             spiral_data.append(
-                dict(theta=np.degrees(sleep_angles), r=sleep_radii, color="blue")
+                dict(
+                    theta=np.degrees(sleep_angles),
+                    r=sleep_radii,
+                    color=day_color,
+                    name=str(row["day"].date()),
+                    showlegend=True,
+                )
             )
 
         # Create plot
@@ -630,7 +646,8 @@ class SleepData:
                     theta=entry["theta"],
                     mode="lines",
                     line=dict(color=entry["color"], width=4),
-                    showlegend=False,
+                    name=entry.get("name", None),
+                    showlegend=entry.get("showlegend", False),
                 )
             )
 
@@ -651,15 +668,10 @@ class SleepData:
                 radialaxis=dict(
                     showline=False,
                     showgrid=False,
-                    tickmode="array",
-                    tickvals=np.arange(0, max_radius + 1),
-                    ticktext=[
-                        (min_day + pd.Timedelta(days=i)).strftime("%b %d")
-                        for i in range(max_radius + 1)
-                    ],
+                    tickvals=[],
                 ),
             ),
-            showlegend=False,
+            showlegend=True,
         )
 
         # Save and show plot
