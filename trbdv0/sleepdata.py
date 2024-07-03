@@ -832,7 +832,14 @@ class SleepData:
         ax2.xaxis.grid(True, color="black", linestyle="-", linewidth=0.5, alpha=0.8)
 
         def plot_period(
-            start_time, end_time, start_offset, color, linestyle="-", lw=4, alpha=1
+            start_time,
+            end_time,
+            start_offset,
+            color,
+            linestyle="-",
+            lw=5,
+            alpha=1,
+            edgecolor=None,
         ):
             start_angle = (start_time.hour * 60 + start_time.minute) / 1440 * 2 * np.pi
             end_angle = (end_time.hour * 60 + end_time.minute) / 1440 * 2 * np.pi
@@ -850,6 +857,15 @@ class SleepData:
             )
             radii = np.linspace(start_radius, end_radius, 100)
 
+            if edgecolor:
+                ax2.plot(
+                    angles,
+                    radii,
+                    color=edgecolor,
+                    linewidth=lw,
+                    linestyle=linestyle,
+                    alpha=alpha,
+                )
             ax2.plot(
                 angles,
                 radii,
@@ -920,15 +936,24 @@ class SleepData:
 
         # Plot awake periods first
         for start_time, end_time, start_offset in awake_periods:
-            plot_period(start_time, end_time, start_offset, "lightgray", linestyle="--")
+            plot_period(
+                start_time,
+                end_time,
+                start_offset,
+                "lightgray",
+                alpha=0.3,
+                linestyle="--",
+            )
         # Plot non-worn periods last to ensure they are on top
         for start_time, end_time, start_offset in non_worn_periods:
-            plot_period(start_time, end_time, start_offset, "red", lw=4)
+            plot_period(
+                start_time, end_time, start_offset, "skyblue", edgecolor="black"
+            )
 
         # Custom legend
         custom_lines = [
             Line2D([0], [0], color="lightgray", lw=4, linestyle="--"),
-            Line2D([0], [0], color="red", lw=4),
+            Line2D([0], [0], color="skyblue", lw=4),
         ] + [
             Line2D([0], [0], color=day_colors[day], lw=4, linestyle="-")
             for day in dataframe["day"].unique()
