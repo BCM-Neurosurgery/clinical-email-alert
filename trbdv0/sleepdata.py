@@ -801,157 +801,142 @@ class SleepData:
 
         ax1.legend(title="Sleep Phases and Averages")
 
-        # Plot sleep habit polar plot on the second subplot
-        df2 = pd.DataFrame(self.data)
-        df2["bedtime_start"] = pd.to_datetime(df2["bedtime_start"])
-        df2["bedtime_end"] = pd.to_datetime(df2["bedtime_end"])
-        df2["day"] = pd.to_datetime(df2["day"])
+        # Plot spiral chart
+        dataframe = pd.DataFrame(self.data)
+        dataframe["day"] = pd.to_datetime(dataframe["day"])
+        dataframe["bedtime_start"] = pd.to_datetime(
+            dataframe["bedtime_start"].str.slice(0, 19)
+        )
+        dataframe["bedtime_end"] = pd.to_datetime(
+            dataframe["bedtime_end"].str.slice(0, 19)
+        )
+        dataframe["timestamp"] = pd.to_datetime(dataframe["timestamp"].str.slice(0, 19))
 
-        df2.sort_values("day", inplace=True)
+        # Find the minimum date from bedtime_start
+        min_day = dataframe["bedtime_start"].dt.date.min()
 
-        ax2 = axes[1]
+        colors = list(mcolors.TABLEAU_COLORS.values())
+        day_colors = {
+            day: colors[i % len(colors)]
+            for i, day in enumerate(dataframe["day"].unique())
+        }
+
         ax2 = fig.add_subplot(122, projection="polar")
         ax2.set_theta_direction(-1)
-        ax2.set_theta_zero_location("N")
+        ax2.set_theta_offset(np.pi / 2.0)
+        ax2.set_xticks(np.linspace(0, 2 * np.pi, 24, endpoint=False))
+        ax2.set_xticklabels([f"{i}:00" for i in range(24)])
+        ax2.set_yticklabels([])
 
-        ax2.set_facecolor("floralwhite")
-        fig.set_facecolor("floralwhite")
+        ax2.grid(False)
+        ax2.xaxis.grid(True, color="black", linestyle="-", linewidth=0.5, alpha=0.8)
 
-        base_radius = 10  # Radius of the innermost circle
-        width = 2
+        def plot_period(
+            start_time, end_time, start_offset, color, linestyle="-", lw=4, alpha=1
+        ):
+            start_angle = (start_time.hour * 60 + start_time.minute) / 1440 * 2 * np.pi
+            end_angle = (end_time.hour * 60 + end_time.minute) / 1440 * 2 * np.pi
 
-        alpha = 0.75
-        edgecolor = "black"
-        color_palette = get_cmap("Set2").colors[:7]
+            if end_angle < start_angle:
+                end_angle += 2 * np.pi
 
-        unique_days = df2["day"].drop_duplicates().reset_index(drop=True)
-        for index, day in enumerate(unique_days):
-            color = color_palette[index % 7]
-            day_data = df2[df2["day"] == day]
-            radius = base_radius + index * width
-            for _, row in day_data.iterrows():
-                if pd.isna(row["bedtime_start"]) and pd.isna(row["bedtime_end"]):
-                    ax2.barh(
-                        radius,
-                        0,
-                        left=0,
-                        height=width,
-                        color=color,
-                        alpha=alpha,
-                        edgecolor=edgecolor,
-                    )
-                    continue
+            start_radius = start_offset + start_angle / (2 * np.pi)
+            end_radius = start_offset + end_angle / (2 * np.pi)
 
-                # Convert timezone-aware datetime to the correct number for plotting
-                start_frac = (
-                    row["bedtime_start"] - row["bedtime_start"].normalize()
-                ).total_seconds() / 86400
-                end_frac = (
-                    row["bedtime_end"] - row["bedtime_end"].normalize()
-                ).total_seconds() / 86400
+            angles = np.linspace(
+                start_angle + 2 * np.pi * start_offset,
+                end_angle + 2 * np.pi * start_offset,
+                100,
+            )
+            radii = np.linspace(start_radius, end_radius, 100)
 
-                start_theta = start_frac * 2 * np.pi
-                end_theta = end_frac * 2 * np.pi
+            ax2.plot(
+                angles,
+                radii,
+                color=color,
+                linewidth=lw,
+                linestyle=linestyle,
+                alpha=alpha,
+            )
 
-                # If bedtime goes over midnight
-                if start_theta > end_theta:
-                    ax2.barh(
-                        radius,
-                        2 * np.pi - start_theta,
-                        left=start_theta,
-                        height=width,
-                        color=color,
-                        alpha=alpha,
-                        edgecolor=edgecolor,
-                    )
-                    ax2.barh(
-                        radius,
-                        end_theta,
-                        left=0,
-                        height=width,
-                        color=color,
-                        alpha=alpha,
-                        edgecolor=edgecolor,
-                    )
+        dataframe = dataframe.sort_values(by="bedtime_start")
+        awake_periods = []
+        non_worn_periods = []
+
+        for index in range(len(dataframe)):
+            row = dataframe.iloc[index]
+            bedtime_start = row["bedtime_start"]
+            bedtime_end = row["bedtime_end"]
+            day_color = day_colors[row["day"]]
+            class_5_min = row["class_5_min"]
+            timestamp = row["timestamp"]
+
+            start_offset = (bedtime_start.date() - min_day).days
+
+            # Plot sleep period
+            plot_period(bedtime_start, bedtime_end, start_offset, day_color)
+
+            # Collect awake periods if not the last row
+            if index < len(dataframe) - 1:
+                next_row = dataframe.iloc[index + 1]
+                next_bedtime_start = next_row["bedtime_start"]
+                awake_start = bedtime_end
+                awake_end = next_bedtime_start
+                awake_start_offset = (awake_start.date() - min_day).days
+
+                if awake_start.date() == awake_end.date():
+                    awake_periods.append((awake_start, awake_end, awake_start_offset))
                 else:
-                    ax2.barh(
-                        radius,
-                        end_theta - start_theta,
-                        left=start_theta,
-                        height=width,
-                        color=color,
-                        alpha=alpha,
-                        edgecolor=edgecolor,
-                    )
+                    # Awake period spans multiple days
+                    midnight = awake_start.replace(hour=23, minute=59, second=59)
+                    awake_periods.append((awake_start, midnight, awake_start_offset))
+                    next_start_offset = (awake_end.date() - min_day).days
+                    next_midnight = awake_end.replace(hour=0, minute=0, second=0)
+                    awake_periods.append((next_midnight, awake_end, next_start_offset))
 
-                class_5_mins = row.get("class_5_min", "")
-                timestamp = row.get("timestamp")
-                if class_5_mins and timestamp:
-                    start_time = pd.to_datetime(timestamp).time()
-                    start_time_seconds = (
-                        start_time.hour * 3600
-                        + start_time.minute * 60
-                        + start_time.second
-                    )
-                    start_offset = start_time_seconds / 86400 * 2 * np.pi
-
-                    # Find continuous non-wear periods
-                    non_wear_periods = []
-                    current_period = None
-                    for i, c in enumerate(class_5_mins):
-                        if c == "0":
-                            if current_period is None:
-                                current_period = [i]
-                        else:
-                            if current_period is not None:
-                                current_period.append(i)
-                                non_wear_periods.append(current_period)
-                                current_period = None
-                    if current_period is not None:
-                        current_period.append(len(class_5_mins))
-                        non_wear_periods.append(current_period)
-
-                    for start, end in non_wear_periods:
-                        start_theta = (start / 288) * 2 * np.pi + start_offset
-                        end_theta = (end / 288) * 2 * np.pi + start_offset
-                        ax2.barh(
-                            radius,
-                            end_theta - start_theta,
-                            left=start_theta,
-                            height=width / 2,  # Half the width for non-wear time
-                            color="white",
-                            alpha=alpha,
-                            edgecolor=edgecolor,
+            # Collect non-worn periods as continuous segments
+            start_time = timestamp
+            current_date = start_time.date()
+            non_worn_offset = (current_date - min_day).days
+            non_worn_start = None
+            for i, status in enumerate(class_5_min):
+                end_time = start_time + pd.Timedelta(minutes=5)
+                if end_time.date() != current_date:
+                    non_worn_offset += 1
+                    current_date = end_time.date()
+                if status == "0":
+                    if non_worn_start is None:
+                        non_worn_start = start_time
+                else:
+                    if non_worn_start is not None:
+                        non_worn_periods.append(
+                            (non_worn_start, start_time, non_worn_offset)
                         )
-        # Create the legend
-        day_labels = [day.strftime("%a %Y-%m-%d") for day in unique_days]
-        handles = [
-            plt.Rectangle((0, 0), 1, 1, color=color_palette[i % 7], alpha=alpha)
-            for i in range(len(unique_days))
+                        non_worn_start = None
+                start_time = end_time
+            # Add the last segment if it ends in a non-worn period
+            if non_worn_start is not None:
+                non_worn_periods.append((non_worn_start, start_time, non_worn_offset))
+
+        # Plot awake periods first
+        for start_time, end_time, start_offset in awake_periods:
+            plot_period(start_time, end_time, start_offset, "lightgray", linestyle="--")
+        # Plot non-worn periods last to ensure they are on top
+        for start_time, end_time, start_offset in non_worn_periods:
+            plot_period(start_time, end_time, start_offset, "red", lw=4)
+
+        # Custom legend
+        custom_lines = [
+            Line2D([0], [0], color="lightgray", lw=4, linestyle="--"),
+            Line2D([0], [0], color="red", lw=4),
+        ] + [
+            Line2D([0], [0], color=day_colors[day], lw=4, linestyle="-")
+            for day in dataframe["day"].unique()
         ]
-        non_wear_handle = plt.Rectangle((0, 0), 1, 1, color="white", alpha=alpha)
-        handles.append(non_wear_handle)
-        day_labels.append("Non-Wear Time")
-        plt.legend(handles, day_labels, loc="upper left", bbox_to_anchor=(1, 1))
-
-        ax2.set_rticks([])  # Hide radial ticks
-        ax2.set_xticks(
-            np.linspace(0, 2 * np.pi, 24, endpoint=False)
-        )  # Set ticks every hour
-        ax2.set_xticklabels(
-            [f"{(i % 24):02d}:00" for i in range(24)]
-        )  # Label every hour
-
-        # Adjust subplot spacing
-        plt.subplots_adjust(wspace=0.4)
-
-        # Title and labels
-        ax2.set_title(
-            f"Sleep Patterns Over Past {self.get_num_past_days()} Days",
-            va="bottom",
-            family="serif",
-            fontsize=16,
-        )
+        custom_labels = ["Awake Period", "Non-worn Period"] + [
+            f"{day.date()}" for day in dataframe["day"].unique()
+        ]
+        ax2.legend(custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1, 1))
         plt.tight_layout()
 
         # Save the combined figure
