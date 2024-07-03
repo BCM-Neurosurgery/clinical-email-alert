@@ -754,7 +754,7 @@ class SleepData:
 
         # Plot sleep distribution on the first subplot
         ax1 = axes[0]
-        color_palette = get_cmap("Set2").colors[:5]
+        color_palette = list(get_cmap("Set2").colors[:4]) + ["white"]
         ax1 = df.plot(
             kind="bar",
             stacked=True,
