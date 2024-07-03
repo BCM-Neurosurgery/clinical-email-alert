@@ -7,10 +7,8 @@ from collections import Counter
 import numpy as np
 from matplotlib.cm import get_cmap
 import os
-import plotly.express as px
-import plotly.graph_objects as go
-import pytz
 import matplotlib.colors as mcolors
+from matplotlib.lines import Line2D
 
 # TODO: how to define a day?
 
@@ -557,6 +555,7 @@ class SleepData:
         dataframe["bedtime_end"] = pd.to_datetime(
             dataframe["bedtime_end"].str.slice(0, 19)
         )
+        dataframe["timestamp"] = pd.to_datetime(dataframe["timestamp"].str.slice(0, 19))
 
         # Find the minimum date from bedtime_start
         min_day = dataframe["bedtime_start"].dt.date.min()
@@ -577,7 +576,9 @@ class SleepData:
         ax.grid(False)
         ax.xaxis.grid(True, color="black", linestyle="-", linewidth=0.5, alpha=0.8)
 
-        def plot_period(start_time, end_time, start_offset, color, linestyle="-"):
+        def plot_period(
+            start_time, end_time, start_offset, color, linestyle="-", lw=4, alpha=1
+        ):
             start_angle = (start_time.hour * 60 + start_time.minute) / 1440 * 2 * np.pi
             end_angle = (end_time.hour * 60 + end_time.minute) / 1440 * 2 * np.pi
 
@@ -594,7 +595,14 @@ class SleepData:
             )
             radii = np.linspace(start_radius, end_radius, 100)
 
-            ax.plot(angles, radii, color=color, linewidth=2, linestyle=linestyle)
+            ax.plot(
+                angles,
+                radii,
+                color=color,
+                linewidth=lw,
+                linestyle=linestyle,
+                alpha=alpha,
+            )
 
         dataframe = dataframe.sort_values(by="bedtime_start")
 
@@ -603,6 +611,8 @@ class SleepData:
             bedtime_start = row["bedtime_start"]
             bedtime_end = row["bedtime_end"]
             day_color = day_colors[row["day"]]
+            class_5_min = row["class_5_min"]
+            timestamp = row["timestamp"]
 
             start_offset = (bedtime_start.date() - min_day).days
 
@@ -624,6 +634,7 @@ class SleepData:
                         awake_start_offset,
                         "lightgray",
                         linestyle="--",
+                        alpha=0.6,
                     )
                 else:
                     # Awake period spans multiple days
@@ -634,6 +645,7 @@ class SleepData:
                         awake_start_offset,
                         "lightgray",
                         linestyle="--",
+                        alpha=0.6,
                     )
                     next_start_offset = (awake_end.date() - min_day).days
                     next_midnight = awake_end.replace(hour=0, minute=0, second=0)
@@ -643,20 +655,43 @@ class SleepData:
                         next_start_offset,
                         "lightgray",
                         linestyle="--",
+                        alpha=0.6,
                     )
 
-        # Custom legend
-        from matplotlib.lines import Line2D
+            # Plot non-worn periods as continuous segments
+            start_time = timestamp
+            current_date = start_time.date()
+            non_worn_start = None
+            non_worn_offset = (current_date - min_day).days
+            for i, status in enumerate(class_5_min):
+                end_time = start_time + pd.Timedelta(minutes=5)
+                if end_time.date() != current_date:
+                    non_worn_offset += 1
+                    current_date = end_time.date()
+                if status == "0":
+                    if non_worn_start is None:
+                        non_worn_start = start_time
+                else:
+                    if non_worn_start is not None:
+                        plot_period(
+                            non_worn_start, start_time, non_worn_offset, "red", lw=4
+                        )
+                        non_worn_start = None
+                start_time = end_time
+            # Plot the last segment if it ends in a non-worn period
+            if non_worn_start is not None:
+                plot_period(non_worn_start, start_time, non_worn_offset, "red", lw=4)
 
         # Custom legend
         custom_lines = [
             Line2D([0], [0], color="lightgray", lw=2, linestyle="--"),
+            Line2D([0], [0], color="red", lw=2, linestyle=":"),
         ] + [
             Line2D([0], [0], color=day_colors[day], lw=2, linestyle="-")
             for day in dataframe["day"].unique()
         ]
-        custom_labels = ["Awake Period"] + [
-            f"{day.date()}" for day in dataframe["day"].unique()
+        custom_labels = ["Awake Period", "Non-worn Period"] + [
+            f"Sleep Period {day.date()}" for day in dataframe["day"].unique()
         ]
         ax.legend(
             custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1.05, 1)
