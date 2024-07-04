@@ -24,7 +24,7 @@ class SleepData:
         self.data = data
         # self.sleep_data_one_day -> SleepDataOneDay object
         self.sleep_data_one_day = {}
-        self.num_past_days = len(self.data)
+        self.num_past_days = len(self.get_available_dates())
 
     def get_num_past_days(self):
         return self.num_past_days
@@ -940,20 +940,26 @@ class SleepData:
                 start_time,
                 end_time,
                 start_offset,
-                "lightgray",
-                alpha=0.3,
+                "white",
                 linestyle="--",
+                edgecolor="black",
             )
         # Plot non-worn periods last to ensure they are on top
         for start_time, end_time, start_offset in non_worn_periods:
             plot_period(
-                start_time, end_time, start_offset, "skyblue", edgecolor="black"
+                start_time, end_time, start_offset, "lightgray", edgecolor="black"
             )
 
         # Custom legend
         custom_lines = [
-            Line2D([0], [0], color="lightgray", lw=4, linestyle="--"),
-            Line2D([0], [0], color="skyblue", lw=4),
+            Line2D(
+                [0],
+                [0],
+                color="white",
+                lw=4,
+                linestyle="--",
+            ),
+            Line2D([0], [0], color="lightgray", lw=4),
         ] + [
             Line2D([0], [0], color=day_colors[day], lw=4, linestyle="-")
             for day in dataframe["day"].unique()
