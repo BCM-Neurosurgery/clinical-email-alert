@@ -754,7 +754,7 @@ class SleepData:
 
         # Plot sleep distribution on the first subplot
         ax1 = axes[0]
-        color_palette = list(get_cmap("Set2").colors[:4]) + ["white"]
+        color_palette = list(get_cmap("Set2").colors[:4]) + ["lightgray"]
         ax1 = df.plot(
             kind="bar",
             stacked=True,
@@ -837,7 +837,7 @@ class SleepData:
             start_offset,
             color,
             linestyle="-",
-            lw=5,
+            lw=10,
             alpha=1,
             edgecolor=None,
         ):
@@ -941,7 +941,7 @@ class SleepData:
                 end_time,
                 start_offset,
                 "white",
-                linestyle="--",
+                linestyle="-",
                 edgecolor="black",
             )
         # Plot non-worn periods last to ensure they are on top
