@@ -14,10 +14,11 @@ from matplotlib.lines import Line2D
 
 
 class SleepData:
-    def __init__(self, data: list) -> None:
+    def __init__(self, patient, data: list) -> None:
         """Init class
 
         Args:
+            patient (str): e.g. Percept010
             data (list): list of dicts of sleep info
         """
         # self.data looks like [{}, {}, ..., {}]
@@ -25,6 +26,7 @@ class SleepData:
         # self.sleep_data_one_day -> SleepDataOneDay object
         self.sleep_data_one_day = {}
         self.num_past_days = len(self.get_available_dates())
+        self.patient = patient
 
     def get_num_past_days(self):
         return self.num_past_days
@@ -974,7 +976,7 @@ class SleepData:
         plt.savefig(
             os.path.join(
                 out_dir,
-                f"combined_sleep_plots_past_{self.get_num_past_days()}_days.png",
+                f"{self.patient}.png",
             )
         )
 
