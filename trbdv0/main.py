@@ -282,7 +282,7 @@ def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) 
             low_sleep_days = (sleep_df["Total Sleep"] < 5).sum()
             # Get yesterday's sleep if available, otherwise NaN
             yesterdays_sleep = (
-                sleep_df.loc[yesterday_date, "Total Sleep"]
+                round(sleep_df.loc[yesterday_date, "Total Sleep"], 2)
                 if yesterday_date in sleep_df.index
                 else np.nan
             )
