@@ -815,6 +815,7 @@ class SleepData:
         dataframe["timestamp"] = pd.to_datetime(dataframe["timestamp"].str.slice(0, 19))
 
         # Find the minimum date from bedtime_start
+        dataframe = dataframe.dropna()
         min_day = dataframe["bedtime_start"].dt.date.min()
 
         colors = list(mcolors.TABLEAU_COLORS.values())
