@@ -301,6 +301,10 @@ def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) 
     # Create DataFrame with all patient rows
     df = pd.DataFrame(df_rows)
 
+    # Round specified columns to 2 decimal places
+    df["Average Sleep (hours)"] = df["Average Sleep (hours)"].round(2)
+    df["Yesterday's Sleep (hours)"] = df["Yesterday's Sleep (hours)"].round(2)
+
     # Convert DataFrame to HTML table with conditional formatting
     df_html = (
         df.style.map(
