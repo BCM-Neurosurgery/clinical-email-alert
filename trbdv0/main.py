@@ -306,7 +306,7 @@ def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) 
         df.style.format(
             {"Average Sleep (hours)": "{:.2f}", "Yesterday's Sleep (hours)": "{:.2f}"}
         )
-        .applymap(
+        .map(
             lambda val: (
                 "background-color: red"
                 if pd.isna(val) or (isinstance(val, (int, float)) and val < 5)
