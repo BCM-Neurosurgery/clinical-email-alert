@@ -156,35 +156,52 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
     return res
 
 
-def generate_subject_line(stats_dict: dict, today_date: str) -> str:
+def generate_subject_line(all_patient_stats: list) -> str:
     """Generate a single status for all patients in the email subject line and list patient names
 
     Args:
-        stats_dict (dict): {"patient1": {"average_sleep": float, "sleep_df": DataFrame},
-                            "patient2": {"average_sleep": float, "sleep_df": DataFrame}}
-        today_date (str): Today's date in the format "2024-06-01"
+        all_patient_stats (list): [{"patient": "Percept010", "average_sleep": float, "average_steps": float}, ...]
 
     Returns:
         str: A single status subject line for the email listing all patients
     """
     overall_status = "[All Clear]"
-    yesterday_date = (
-        datetime.strptime(today_date, "%Y-%m-%d") - timedelta(days=1)
-    ).strftime("%Y-%m-%d")
-
-    patient_list = list(stats_dict.keys())
+    yesterday_date = get_yesterdays_date()
+    patient_list = [patient_stats["patient"] for patient_stats in all_patient_stats]
 
     # Iterate over all patients and update overall_status if any warning occurs
-    for patient, stats in stats_dict.items():
-        sleep_df = stats.get("sleep_df", pd.DataFrame())
+    for patient_stats in all_patient_stats:
+        sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
 
         if sleep_df.empty:
             overall_status = "[Warning: No Sleep Data]"
             break
         elif yesterday_date not in sleep_df.index:
             overall_status = "[Warning: Missing Sleep Data]"
-        elif sleep_df.loc[yesterday_date, "Total Sleep"] < 5:
+        elif patient_stats["yesterday_sleep"] < 5:
             overall_status = "[Warning: Sleep < 5 hours]"
+        elif (
+            not pd.isna(patient_stats["yesterday_sleep"])
+            and not pd.isna(patient_stats["average_sleep"])
+            and patient_stats["average_sleep"] > 0
+            and (
+                patient_stats["yesterday_sleep"] < 0.75 * patient_stats["average_sleep"]
+                or patient_stats["yesterday_sleep"]
+                > 1.25 * patient_stats["average_sleep"]
+            )
+        ):
+            overall_status = "[Warning: Sleep Variation]"
+        elif (
+            not pd.isna(patient_stats.get("yesterday_steps"))
+            and not pd.isna(patient_stats.get("average_steps"))
+            and patient_stats["average_steps"] > 0
+            and (
+                patient_stats["yesterday_steps"] < 0.75 * patient_stats["average_steps"]
+                or patient_stats["yesterday_steps"]
+                > 1.25 * patient_stats["average_steps"]
+            )
+        ):
+            overall_status = "[Warning: Steps Variation]"
 
         # If any warning is found, stop the loop as it is the most critical
         if overall_status != "[All Clear]":
@@ -198,49 +215,43 @@ def generate_subject_line(stats_dict: dict, today_date: str) -> str:
     return subject
 
 
-def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) -> str:
+def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> str:
     """Generate email body with an additional column for 'Yesterday's Sleep'
 
     Args:
         missing_dates_dict (dict): {"patient1": ["2024-06-01", ...], "patient2": [...]}
         total_days (int): number of total days
-        stats_dict (dict): {"patient1": {"average_sleep": float, "sleep_df": DataFrame},
-                            "patient2": {"average_sleep": float, "sleep_df": DataFrame}}
-        today_date (str): Today's date in the format "2024-06-01"
+        all_patients_stats (list): [{"patient": "patient1", "average_sleep": float, "average_steps": float}, ...]
 
     Returns:
         str: a string of email body
     """
     df_rows = []
 
-    # Calculate yesterday's date
-    yesterday_date = get_yesterdays_date()
-
-    for patient, stats in stats_dict.items():
-        missing_dates = missing_dates_dict.get(patient, [])
+    for patient_stats in all_patients_stats:
+        missing_dates = missing_dates_dict.get(patient_stats["patient"], [])
         missing_count = len(missing_dates)
 
-        sleep_df = stats.get("sleep_df", pd.DataFrame())
+        sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
 
         if sleep_df.empty:
             low_sleep_days = np.nan
             yesterdays_sleep = np.nan
+            yesterday_step = np.nan
         else:
             low_sleep_days = (sleep_df["Total Sleep"] < 5).sum()
-            # Get yesterday's sleep if available, otherwise NaN
-            yesterdays_sleep = (
-                sleep_df.loc[yesterday_date, "Total Sleep"]
-                if yesterday_date in sleep_df.index
-                else np.nan
-            )
+            yesterdays_sleep = patient_stats.get("yesterday_sleep")
+            yesterday_step = patient_stats.get("yesterday_steps")
 
         # Generate row for each patient
         row = {
-            "Patient": patient,
-            "Average Sleep (hours)": stats.get("average_sleep", np.nan),
+            "Patient": patient_stats["patient"],
+            "Average Sleep (hours)": patient_stats.get("average_sleep", np.nan),
+            "Average Steps": patient_stats.get("average_steps", np.nan),
             "Non-Compliance Days": missing_count,
             "Days with < 5 hours Sleep": low_sleep_days,
             "Yesterday's Sleep (hours)": yesterdays_sleep,
+            "Yesterday's Step Count": yesterday_step,
         }
 
         df_rows.append(row)
@@ -251,7 +262,11 @@ def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) 
     # Convert DataFrame to HTML table with conditional formatting
     df_html = (
         df.style.format(
-            {"Average Sleep (hours)": "{:.2f}", "Yesterday's Sleep (hours)": "{:.2f}"}
+            {
+                "Average Sleep (hours)": "{:.2f}",
+                "Average Steps": "{:.0f}",
+                "Yesterday's Sleep (hours)": "{:.2f}",
+            }
         )
         .map(
             lambda val: (
@@ -344,7 +359,7 @@ def main(config_file):
     email_sender.connect()
 
     missing_dates_dict = {}
-    stats_dict = {}
+    all_patient_stats = []
     all_attachments = []
 
     for patient in config["active_patients"]:
@@ -383,15 +398,15 @@ def main(config_file):
         missing_dates = get_missing_dates(past_dates, patient_in_dir)
 
         missing_dates_dict[patient] = missing_dates
-        stats_dict[patient] = stats
+        all_patient_stats.append(stats)
 
         logger.info(f"Data for patient {patient} processed successfully!")
 
     # send a single email to recepients
     email_body = generate_email_body(
-        missing_dates_dict, num_past_days, stats_dict, today_date
+        missing_dates_dict, num_past_days, all_patient_stats
     )
-    subject = generate_subject_line(stats_dict, today_date)
+    subject = generate_subject_line(all_patient_stats)
     email_sender.send_email(email_recipients, subject, email_body, all_attachments)
     logger.info(f"Email for patient(s) {config['active_patients']} sent successfully!")
     email_sender.disconnect()

@@ -119,13 +119,21 @@ class SleepData:
             if yesterday_date in df.index
             else np.nan
         )
+        yesterday_step = (
+            df.loc[yesterday_date, "Step Count"]
+            if yesterday_date in df.index
+            else np.nan
+        )
 
         return {
+            "patient": self.patient,
             "date_range": (df.index.min(), df.index.max()),
             "today": today_date,
             "yesterday": yesterday_date,
             "yesterday_sleep": yesterday_sleep,
+            "yesterday_steps": yesterday_step,
             "average_sleep": df["Total Sleep"].mean() if not df.empty else np.nan,
+            "average_steps": df["Step Count"].mean() if not df.empty else np.nan,
             "sleep_df": df,
         }
 
