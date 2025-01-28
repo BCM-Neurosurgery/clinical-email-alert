@@ -6,6 +6,11 @@ from matplotlib.cm import get_cmap
 import os
 import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
+from trbdv0.utils import (
+    get_todays_date,
+    get_yesterdays_date,
+    PHASE_MAPPING,
+)
 
 # TODO: how to define a day?
 
@@ -24,6 +29,7 @@ class SleepData:
         self.sleep_data_one_day = {}
         self.num_past_days = len(self.get_available_dates())
         self.patient = patient
+        self.summary_stats = self.get_summary_stats()
 
     def get_num_past_days(self):
         return self.num_past_days
@@ -53,6 +59,75 @@ class SleepData:
             if sleep_chunk["day"] == date:
                 res.append(sleep_chunk)
         return res
+
+    def get_summary_stats(self) -> dict:
+        """Get summary stats of sleep data
+
+        Returns:
+            dict: {
+                "patient": "Percept010",
+                "date_range": ("2023-09-01", "2023-09-14"), # available range in sleep data
+                "today": "2023-09-14", # might not be in the data
+                "yesterday": "2023-09-13",
+                "yesterday_sleep": 7.5,
+                "average_sleep": 7.5, # average sleep in sleep data
+                "sleep_df": pd.DataFrame,
+            }
+        """
+        # Collect counters by day
+        sleep_counts = {}
+        for entry in self.data:
+            day = entry["day"]
+            if day not in sleep_counts:
+                sleep_counts[day] = Counter()
+            sleep_counts[day] += Counter(entry["sleep_phase_5_min"])
+            sleep_counts[day]["non_wear_time"] = entry.get("non_wear_time", 0) / 3600
+            sleep_counts[day]["steps"] = entry.get("steps", 0)
+
+        # Convert 5-min increments to hours
+        for day, counter in sleep_counts.items():
+            for phase in list(counter.keys()):
+                if phase not in ["non_wear_time", "steps"]:
+                    counter[phase] = (counter[phase] * 5) / 60
+
+        # Flatten data into a DataFrame
+        all_keys = ["1", "2", "3", "4", "non_wear_time", "steps"]
+        flattened_data = {
+            d: {k: sleep_counts[d].get(k, np.nan) for k in all_keys}
+            for d in sleep_counts
+        }
+        df = pd.DataFrame.from_dict(flattened_data, orient="index").sort_index()
+        df.columns = [PHASE_MAPPING.get(col, f"Phase {col}") for col in df.columns]
+
+        # Reorder columns and calculate total sleep
+        column_order = [
+            "Deep Sleep",
+            "Light Sleep",
+            "REM Sleep",
+            "Awake",
+            "Non-Wear Time",
+            "Step Count",
+        ]
+        df = df.reindex(columns=column_order).fillna(0)
+        df["Total Sleep"] = df[["Deep Sleep", "Light Sleep", "REM Sleep"]].sum(axis=1)
+
+        # Get yesterday's sleep and average
+        today_date = get_todays_date()
+        yesterday_date = get_yesterdays_date()
+        yesterday_sleep = (
+            df.loc[yesterday_date, "Total Sleep"]
+            if yesterday_date in df.index
+            else np.nan
+        )
+
+        return {
+            "date_range": (df.index.min(), df.index.max()),
+            "today": today_date,
+            "yesterday": yesterday_date,
+            "yesterday_sleep": yesterday_sleep,
+            "average_sleep": df["Total Sleep"].mean() if not df.empty else np.nan,
+            "sleep_df": df,
+        }
 
     def plot_combined_sleep_plots(self, out_dir: str):
         """
