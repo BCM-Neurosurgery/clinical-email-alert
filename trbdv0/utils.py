@@ -1,6 +1,15 @@
 from datetime import datetime, timedelta
 import json
 
+PHASE_MAPPING = {
+    "1": "Deep Sleep",
+    "2": "Light Sleep",
+    "3": "REM Sleep",
+    "4": "Awake",
+    "non_wear_time": "Non-Wear Time",
+    "steps": "Step Count",
+}
+
 
 # Helper function to parse the date and time
 def parse_date(date_str):

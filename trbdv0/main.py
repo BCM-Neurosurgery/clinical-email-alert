@@ -7,12 +7,18 @@ Usage
 """
 
 from trbdv0.sleepdata import SleepData
+from trbdv0.utils import (
+    get_todays_date,
+    get_yesterdays_date,
+    get_past_dates,
+    read_json,
+    read_config,
+)
 import os
 import logging
 import pytz
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
-import json
 import pandas as pd
 from trbdv0.send_email import EmailSender
 import argparse
@@ -55,75 +61,9 @@ def setup_logger(name, file_path, level=logging.INFO):
     return logger
 
 
-def get_past_dates(end_date: str, past_days: int = 7) -> list:
-    """Get week dates on and before end_date
-
-    Args:
-        end_date (str): e.g. "2023-07-05"
-
-    Returns:
-        list: a list of dates going back for a week on and before end_date
-    """
-    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
-    date_list = [end_date_dt - timedelta(days=x) for x in range(1, past_days + 1)]
-    return [date.strftime("%Y-%m-%d") for date in date_list]
-
-
-def read_json(json_path: str) -> list:
-    """Load json and return list
-
-    Args:
-        json_path (str): path to json
-
-    Returns:
-        list: each sleep.json contains a list of dicts
-    """
-    with open(json_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def get_todays_date() -> str:
-    """Get date of today
-
-    Returns:
-        str: e.g. "2024-05-01"
-    """
-    today = datetime.today()
-    return today.strftime("%Y-%m-%d")
-
-
-def missing_data_on_date(sleep_data: list, date: str) -> bool:
-    """Return True if missing data on date
-
-    Args:
-        sleep_data (list): [{}, {}, ...]
-        date (str): "2023-07-15"
-
-    Returns:
-        bool: True if we are missing data
-    """
-    for data in sleep_data:
-        if data["day"] == date and pd.isna(data["bedtime_start"]):
-            return True
-    return False
-
-
-def read_config(config_file: str) -> dict:
-    """Read config.json into dict
-
-    Args:
-        config_file (str): path to config file
-
-    Returns:
-        dict: loaded into dictionary
-    """
-    with open(config_file, "r") as file:
-        config = json.load(file)
-    return config
-
-
 def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> list:
-    """Merge sleep data based on dates, return a merged list with selected keys
+    """Merge sleep data based on dates, return a merged list with selected keys.
+    If sleep data is missing, fill in with empty values.
 
     Args:
         dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
@@ -154,37 +94,46 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
             )
         else:
             sleep_data = read_json(patient_date_json)
-            activity_data = (
-                read_json(daily_activity_json)
-                if os.path.exists(daily_activity_json)
-                else []
-            )
 
-            for sleep_entry in sleep_data:
-                entry = {
+        if not os.path.exists(daily_activity_json):
+            logger.error(f"{date} daily activity data not found.")
+            res.append(
+                {
                     "day": date,
-                    "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", ""),
-                    "bedtime_start": sleep_entry.get("bedtime_start", None),
-                    "bedtime_end": sleep_entry.get("bedtime_end", None),
                     "class_5_min": "",
                     "non_wear_time": 0,
                     "timestamp": "",
+                    "steps": 0,
                 }
+            )
+        else:
+            activity_data = read_json(daily_activity_json)
 
-                # Find corresponding activity entry with the same day
-                matching_activity = next(
-                    (
-                        activity
-                        for activity in activity_data
-                        if activity.get("day") == date
-                    ),
-                    {},
-                )
-                entry["class_5_min"] = matching_activity.get("class_5_min", "")
-                entry["non_wear_time"] = matching_activity.get("non_wear_time", 0)
-                entry["timestamp"] = matching_activity.get("timestamp", "")
+        for sleep_entry in sleep_data:
+            entry = {
+                "day": date,
+                "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", ""),
+                "bedtime_start": sleep_entry.get("bedtime_start", None),
+                "bedtime_end": sleep_entry.get("bedtime_end", None),
+                "class_5_min": "",
+                "non_wear_time": 0,
+                "timestamp": "",
+                "steps": 0,
+            }
 
-                res.append(entry)
+            # Find corresponding activity entry with the same day
+            matching_activity = next(
+                (activity for activity in activity_data if activity.get("day") == date),
+                {},
+            )
+            entry.update(
+                {
+                    key: matching_activity.get(key, entry[key])
+                    for key in ["class_5_min", "non_wear_time", "timestamp", "steps"]
+                }
+            )
+
+            res.append(entry)
     return res
 
 
@@ -265,9 +214,7 @@ def generate_email_body(missing_dates_dict, total_days, stats_dict, today_date) 
     df_rows = []
 
     # Calculate yesterday's date
-    yesterday_date = (
-        datetime.strptime(today_date, "%Y-%m-%d") - timedelta(days=1)
-    ).strftime("%Y-%m-%d")
+    yesterday_date = get_yesterdays_date()
 
     for patient, stats in stats_dict.items():
         missing_dates = missing_dates_dict.get(patient, [])
@@ -422,7 +369,8 @@ def main(config_file):
         data = SleepData(patient, sleeps)
 
         # get summary for past x days
-        stats = data.plot_combined_sleep_plots(patient_out_dir)
+        stats = data.summary_stats
+        data.plot_combined_sleep_plots(patient_out_dir)
         logger.info(
             f"sleep combined plot for past {num_past_days} days saved to {patient_out_dir}."
         )

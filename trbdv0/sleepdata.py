@@ -133,61 +133,7 @@ class SleepData:
         """
         Plot sleep distribution and sleep habit polar plot side by side.
         """
-        sleep_data = {}
-
-        for entry in self.data:
-            day = entry["day"]
-            sleep_phases = entry["sleep_phase_5_min"]
-            phase_counts = Counter(sleep_phases)  # Count occurrences of each phase
-
-            if day not in sleep_data:
-                sleep_data[day] = Counter()
-
-            sleep_data[day] += phase_counts
-
-            # Add non_wear_time in hours
-            non_wear_time_seconds = entry.get("non_wear_time", 0)
-            sleep_data[day]["non_wear_time"] = (
-                non_wear_time_seconds / 3600
-            )  # Convert to hours
-
-        # Convert counts to hours (assuming each phase count is in 5 minutes increments)
-        for day in sleep_data:
-            for phase in sleep_data[day]:
-                if (
-                    phase != "non_wear_time"
-                ):  # Skip non_wear_time as it's already in hours
-                    sleep_data[day][phase] = (
-                        sleep_data[day][phase] * 5
-                    ) / 60  # Convert to hours
-
-        all_keys = ["1", "2", "3", "4", "non_wear_time"]
-        flattened_data = {
-            date: {key: sleep_data[date].get(key, np.nan) for key in all_keys}
-            for date in sleep_data
-        }
-        df = pd.DataFrame.from_dict(flattened_data, orient="index")
-        df = df.sort_index(ascending=True)
-        # Rename columns based on sleep phase descriptions
-        phase_mapping = {
-            "1": "Deep Sleep",
-            "2": "Light Sleep",
-            "3": "REM Sleep",
-            "4": "Awake",
-            "non_wear_time": "Non-Wear Time",
-        }
-        df.columns = [phase_mapping.get(col, f"Phase {col}") for col in df.columns]
-
-        # Reorder so that awake and non-wear time are at the top
-        column_order = [
-            "Deep Sleep",
-            "Light Sleep",
-            "REM Sleep",
-            "Awake",
-            "Non-Wear Time",
-        ]
-        df = df[column_order]
-
+        df = self.summary_stats["sleep_df"].drop(columns=["Step Count", "Total Sleep"])
         # Create a figure with two subplots
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(26, 10))
 
@@ -223,14 +169,7 @@ class SleepData:
                     verticalalignment="center",
                 )
 
-        # Calculate total hours of sleep per day, excluding the Awake and Non-Wear Time phases
-        sleep_columns = [
-            "Deep Sleep",
-            "Light Sleep",
-            "REM Sleep",
-        ]  # Only these phases contribute to sleep
-        df["Total Sleep"] = df[sleep_columns].sum(axis=1)
-        average_sleep = df.dropna()["Total Sleep"].mean()
+        average_sleep = self.summary_stats["average_sleep"]
         ax1.axhline(
             y=average_sleep,
             color="r",
@@ -417,8 +356,3 @@ class SleepData:
                 f"{self.patient}.png",
             )
         )
-
-        return {
-            "average_sleep": average_sleep,
-            "sleep_df": df.dropna(),
-        }
