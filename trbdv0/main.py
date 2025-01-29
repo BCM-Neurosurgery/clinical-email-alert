@@ -271,7 +271,6 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
 
         missing_dates = missing_dates_dict.get(patient_stats["patient"], [])
         missing_count = len(missing_dates)
-        sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
 
         row = {
             "Patient": patient_stats["patient"],
@@ -285,15 +284,15 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
         # Add HTML highlighting based on warning types
         if "missing_data" in warning_types:
             row["Missing Days"] = (
-                f'<span style="background-color: yellow">{row["Missing Days"]}</span>'
+                f'<span style="background-color: #ff5252">{row["Missing Days"]}</span>'
             )
         if "low_sleep" in warning_types or "sleep_variation" in warning_types:
             row["Yesterday's Sleep"] = (
-                f'<span style="background-color: yellow">{row["Yesterday\'s Sleep"]}</span>'
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Sleep"]}</span>'
             )
         if "steps_variation" in warning_types:
             row["Yesterday's Steps"] = (
-                f'<span style="background-color: yellow">{row["Yesterday\'s Steps"]}</span>'
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Steps"]}</span>'
             )
 
         df_rows.append(row)
