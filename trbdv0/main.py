@@ -157,30 +157,31 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
 
 
 def generate_subject_line(all_patient_stats: list) -> str:
-    """Generate a single status for all patients in the email subject line and list patient names
+    """Generate a subject line with all warnings for all patients
 
     Args:
         all_patient_stats (list): [{"patient": "Percept010", "average_sleep": float, "average_steps": float}, ...]
 
     Returns:
-        str: A single status subject line for the email listing all patients
+        str: Subject line containing all warnings and patient names
     """
-    overall_status = "[All Clear]"
+    warnings = set()
     yesterday_date = get_yesterdays_date()
     patient_list = [patient_stats["patient"] for patient_stats in all_patient_stats]
 
-    # Iterate over all patients and update overall_status if any warning occurs
+    # Iterate over all patients and collect all warnings
     for patient_stats in all_patient_stats:
         sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
 
         if sleep_df.empty:
-            overall_status = "[Warning: No Sleep Data]"
-            break
+            warnings.add("No Sleep Data")
         elif yesterday_date not in sleep_df.index:
-            overall_status = "[Warning: Missing Sleep Data]"
-        elif patient_stats["yesterday_sleep"] < 5:
-            overall_status = "[Warning: Sleep < 5 hours]"
-        elif (
+            warnings.add("Missing Sleep Data")
+
+        if patient_stats["yesterday_sleep"] < 5:
+            warnings.add("Sleep < 5 hours")
+
+        if (
             not pd.isna(patient_stats["yesterday_sleep"])
             and not pd.isna(patient_stats["average_sleep"])
             and patient_stats["average_sleep"] > 0
@@ -190,8 +191,9 @@ def generate_subject_line(all_patient_stats: list) -> str:
                 > 1.25 * patient_stats["average_sleep"]
             )
         ):
-            overall_status = "[Warning: Sleep Variation]"
-        elif (
+            warnings.add("Sleep Variation")
+
+        if (
             not pd.isna(patient_stats.get("yesterday_steps"))
             and not pd.isna(patient_stats.get("average_steps"))
             and patient_stats["average_steps"] > 0
@@ -201,17 +203,18 @@ def generate_subject_line(all_patient_stats: list) -> str:
                 > 1.25 * patient_stats["average_steps"]
             )
         ):
-            overall_status = "[Warning: Steps Variation]"
+            warnings.add("Steps Variation")
 
-        # If any warning is found, stop the loop as it is the most critical
-        if overall_status != "[All Clear]":
-            break
+    # Create status text
+    status = (
+        "[All Clear]" if not warnings else f"[Warning: {', '.join(sorted(warnings))}]"
+    )
 
     # Convert patient list to a comma-separated string
     patients_str = ", ".join(patient_list)
 
     # Return the overall subject line including the patient names
-    subject = f"{overall_status} for Patients: {patients_str} on {yesterday_date}"
+    subject = f"{status} for Patients: {patients_str} on {yesterday_date}"
     return subject
 
 
