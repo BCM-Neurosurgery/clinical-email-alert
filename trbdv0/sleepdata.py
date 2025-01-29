@@ -80,7 +80,7 @@ class SleepData:
             day = entry["day"]
             if day not in sleep_counts:
                 sleep_counts[day] = Counter()
-            sleep_counts[day] += Counter(entry["sleep_phase_5_min"])
+            sleep_counts[day] += Counter(entry.get("sleep_phase_5_min", ""))
             sleep_counts[day]["non_wear_time"] = entry.get("non_wear_time", 0) / 3600
             sleep_counts[day]["steps"] = entry.get("steps", 0)
 
