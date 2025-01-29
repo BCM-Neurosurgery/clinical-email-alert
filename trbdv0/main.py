@@ -156,176 +156,151 @@ def get_missing_dates(dates: list, patient_dir: str) -> list:
     return res
 
 
-def generate_subject_line(all_patient_stats: list) -> str:
-    """Generate a subject line with all warnings for all patients
+def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
+    """Get all warnings for a patient's health metrics.
+
+    Analyzes sleep and step data to generate warnings for:
+    - Missing data
+    - Low sleep duration (<5 hours)
+    - Abnormal sleep variation (±25% from average)
+    - Abnormal steps variation (±25% from average)
 
     Args:
-        all_patient_stats (list): [{"patient": "Percept010", "average_sleep": float, "average_steps": float}, ...]
+        patient_stats (dict): Patient statistics containing:
+            - sleep_df (pd.DataFrame): Sleep data frame
+            - yesterday_sleep (float): Hours slept yesterday
+            - average_sleep (float): Average sleep hours
+            - yesterday_steps (float): Steps taken yesterday
+            - average_steps (float): Average daily steps
+        yesterday_date (str): Date string for yesterday in format 'YYYY-MM-DD'
 
     Returns:
-        str: Subject line containing all warnings and patient names
+        list: List of tuples (warning_message, warning_type) where warning_type is one of:
+            - 'missing_data': Missing sleep data
+            - 'low_sleep': Sleep duration < 5 hours
+            - 'sleep_variation': Abnormal sleep pattern
+            - 'steps_variation': Abnormal steps pattern
+    """
+    warnings = []
+    sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
+
+    # Sleep data availability warnings
+    if sleep_df.empty:
+        warnings.append(("No Sleep Data", "missing_data"))
+    elif yesterday_date not in sleep_df.index:
+        warnings.append(("Missing Sleep Data", "missing_data"))
+
+    # Sleep duration warning
+    if patient_stats["yesterday_sleep"] < 5:
+        warnings.append(("Sleep < 5 hours", "low_sleep"))
+
+    # Sleep variation warning
+    if (
+        not pd.isna(patient_stats["yesterday_sleep"])
+        and not pd.isna(patient_stats["average_sleep"])
+        and patient_stats["average_sleep"] > 0
+        and (
+            patient_stats["yesterday_sleep"] < 0.75 * patient_stats["average_sleep"]
+            or patient_stats["yesterday_sleep"] > 1.25 * patient_stats["average_sleep"]
+        )
+    ):
+        warnings.append(("Sleep Variation", "sleep_variation"))
+
+    # Steps variation warning
+    if (
+        not pd.isna(patient_stats.get("yesterday_steps"))
+        and not pd.isna(patient_stats.get("average_steps"))
+        and patient_stats["average_steps"] > 0
+        and (
+            patient_stats["yesterday_steps"] < 0.75 * patient_stats["average_steps"]
+            or patient_stats["yesterday_steps"] > 1.25 * patient_stats["average_steps"]
+        )
+    ):
+        warnings.append(("Steps Variation", "steps_variation"))
+
+    return warnings
+
+
+def generate_subject_line(all_patient_stats: list) -> str:
+    """Generate an email subject line summarizing all patient warnings.
+
+    Creates a subject line that includes warning types and affected patient names.
+    If no warnings exist, shows [All Clear].
+
+    Args:
+        all_patient_stats (list): List of dictionaries containing patient stats:
+            [
+                {
+                    "patient": str,
+                    "average_sleep": float,
+                    "average_steps": float,
+                    "yesterday_sleep": float,
+                    "yesterday_steps": float,
+                    "sleep_df": pd.DataFrame
+                },
+                ...
+            ]
+
+    Returns:
+        str: Formatted subject line in format:
+            "[Warning: type1, type2] for Patients: pat1, pat2 on YYYY-MM-DD"
+            or "[All Clear] for Patients: pat1, pat2 on YYYY-MM-DD"
     """
     warnings = set()
     yesterday_date = get_yesterdays_date()
     patient_list = [patient_stats["patient"] for patient_stats in all_patient_stats]
 
-    # Iterate over all patients and collect all warnings
     for patient_stats in all_patient_stats:
-        sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
+        patient_warnings = get_patient_warnings(patient_stats, yesterday_date)
+        warnings.update(warning[0] for warning in patient_warnings)
 
-        if sleep_df.empty:
-            warnings.add("No Sleep Data")
-        elif yesterday_date not in sleep_df.index:
-            warnings.add("Missing Sleep Data")
-
-        if patient_stats["yesterday_sleep"] < 5:
-            warnings.add("Sleep < 5 hours")
-
-        if (
-            not pd.isna(patient_stats["yesterday_sleep"])
-            and not pd.isna(patient_stats["average_sleep"])
-            and patient_stats["average_sleep"] > 0
-            and (
-                patient_stats["yesterday_sleep"] < 0.75 * patient_stats["average_sleep"]
-                or patient_stats["yesterday_sleep"]
-                > 1.25 * patient_stats["average_sleep"]
-            )
-        ):
-            warnings.add("Sleep Variation")
-
-        if (
-            not pd.isna(patient_stats.get("yesterday_steps"))
-            and not pd.isna(patient_stats.get("average_steps"))
-            and patient_stats["average_steps"] > 0
-            and (
-                patient_stats["yesterday_steps"] < 0.75 * patient_stats["average_steps"]
-                or patient_stats["yesterday_steps"]
-                > 1.25 * patient_stats["average_steps"]
-            )
-        ):
-            warnings.add("Steps Variation")
-
-    # Create status text
     status = (
         "[All Clear]" if not warnings else f"[Warning: {', '.join(sorted(warnings))}]"
     )
-
-    # Convert patient list to a comma-separated string
     patients_str = ", ".join(patient_list)
-
-    # Return the overall subject line including the patient names
-    subject = f"{status} for Patients: {patients_str} on {yesterday_date}"
-    return subject
+    return f"{status} for Patients: {patients_str} on {yesterday_date}"
 
 
 def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> str:
-    """Generate email body with an additional column for 'Yesterday's Sleep'
-
-    Args:
-        missing_dates_dict (dict): {"patient1": ["2024-06-01", ...], "patient2": [...]}
-        total_days (int): number of total days
-        all_patients_stats (list): [{"patient": "patient1", "average_sleep": float, "average_steps": float}, ...]
-
-    Returns:
-        str: a string of email body
-    """
     df_rows = []
+    yesterday_date = get_yesterdays_date()
 
     for patient_stats in all_patients_stats:
+        warnings = get_patient_warnings(patient_stats, yesterday_date)
+        warning_types = [w[1] for w in warnings]
+
         missing_dates = missing_dates_dict.get(patient_stats["patient"], [])
         missing_count = len(missing_dates)
-
         sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
 
-        if sleep_df.empty:
-            low_sleep_days = np.nan
-            yesterdays_sleep = np.nan
-            yesterday_step = np.nan
-        else:
-            low_sleep_days = (sleep_df["Total Sleep"] < 5).sum()
-            yesterdays_sleep = patient_stats.get("yesterday_sleep")
-            yesterday_step = patient_stats.get("yesterday_steps")
-
-        # Generate row for each patient
         row = {
             "Patient": patient_stats["patient"],
-            "Average Sleep (hours)": patient_stats.get("average_sleep", np.nan),
-            "Average Steps": patient_stats.get("average_steps", np.nan),
-            "Non-Compliance Days": missing_count,
-            "Days with < 5 hours Sleep": low_sleep_days,
-            "Yesterday's Sleep (hours)": yesterdays_sleep,
-            "Yesterday's Step Count": yesterday_step,
+            "Missing Days": f"{missing_count}/{total_days}",
+            "Average Sleep": f"{patient_stats['average_sleep']:.1f}",
+            "Yesterday's Sleep": f"{patient_stats['yesterday_sleep']:.1f}",
+            "Average Steps": f"{patient_stats.get('average_steps', 'N/A'):.0f}",
+            "Yesterday's Steps": f"{patient_stats.get('yesterday_steps', 'N/A'):.0f}",
         }
+
+        # Add HTML highlighting based on warning types
+        if "missing_data" in warning_types:
+            row["Missing Days"] = (
+                f'<span style="background-color: yellow">{row["Missing Days"]}</span>'
+            )
+        if "low_sleep" in warning_types or "sleep_variation" in warning_types:
+            row["Yesterday's Sleep"] = (
+                f'<span style="background-color: yellow">{row["Yesterday\'s Sleep"]}</span>'
+            )
+        if "steps_variation" in warning_types:
+            row["Yesterday's Steps"] = (
+                f'<span style="background-color: yellow">{row["Yesterday\'s Steps"]}</span>'
+            )
 
         df_rows.append(row)
 
-    # Create DataFrame with all patient rows
+    # Create DataFrame and convert to HTML
     df = pd.DataFrame(df_rows)
-
-    # Convert DataFrame to HTML table with conditional formatting
-    df_html = (
-        df.style.format(
-            {
-                "Average Sleep (hours)": "{:.2f}",
-                "Average Steps": "{:.0f}",
-                "Yesterday's Sleep (hours)": "{:.2f}",
-            }
-        )
-        .map(
-            lambda val: (
-                "background-color: red"
-                if pd.isna(val) or (isinstance(val, (int, float)) and val < 5)
-                else ""
-            ),
-            subset=["Yesterday's Sleep (hours)"],
-        )
-        .set_table_styles(
-            [
-                {
-                    "selector": "th, td",
-                    "props": [("border", "1px solid black"), ("padding", "8px")],
-                },
-                {
-                    "selector": "table",
-                    "props": [
-                        ("border-collapse", "collapse"),
-                        ("width", "100%"),
-                        ("border", "1px solid black"),
-                    ],
-                },
-            ]
-        )
-        .to_html(index=False, border=0, justify="center", escape=False)
-    )
-
-    df_html = df_html.replace(
-        "<table ",
-        '<table style="border-collapse: collapse; width: 100%; border: 1px solid black;" ',
-    )
-
-    # Create missing dates section for each patient
-    missing_dates_section = ""
-    for patient, missing_dates in missing_dates_dict.items():
-        if missing_dates:
-            missing_dates_html = "<br>".join(missing_dates)
-            missing_dates_section += f"""
-            <p><b>Patient {patient}</b> - Missing Dates:</p>
-            <p>{missing_dates_html}</p>
-            """
-
-    # Generate the final email body
-    email_body = f"""
-    <html>
-        <body>
-            <p>Sleep data processed successfully for the past {total_days} days.</p>
-            {df_html}
-            {missing_dates_section}
-            <p>Please see attachments for more details.</p>
-        </body>
-    </html>
-    """
-
-    return email_body
+    return df.to_html(index=False, escape=False)
 
 
 def get_attachments(dir: str):
