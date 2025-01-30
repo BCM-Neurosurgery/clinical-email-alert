@@ -74,36 +74,21 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
     """
     res = []
     for date in dates:
+        sleep_data = []
+        activity_data = []
+
         patient_date_json = os.path.join(patient_dir, date, "sleep.json")
         daily_activity_json = os.path.join(patient_dir, date, "daily_activity.json")
 
         if not os.path.exists(patient_date_json):
             logger.error(f"{date} sleep data not found.")
-            res.append(
-                {
-                    "day": date,
-                    "sleep_phase_5_min": "",
-                    "bedtime_start": None,
-                    "bedtime_end": None,
-                    "class_5_min": "",
-                    "non_wear_time": 0,
-                    "timestamp": "",
-                }
-            )
+            sleep_data = []
         else:
             sleep_data = read_json(patient_date_json)
 
         if not os.path.exists(daily_activity_json):
             logger.error(f"{date} daily activity data not found.")
-            res.append(
-                {
-                    "day": date,
-                    "class_5_min": "",
-                    "non_wear_time": 0,
-                    "timestamp": "",
-                    "steps": 0,
-                }
-            )
+            activity_data = []
         else:
             activity_data = read_json(daily_activity_json)
 
