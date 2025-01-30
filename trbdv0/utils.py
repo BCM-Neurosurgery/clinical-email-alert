@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import json
+import os
 
 PHASE_MAPPING = {
     "1": "Deep Sleep",
@@ -90,3 +91,22 @@ def read_config(config_file: str) -> dict:
     with open(config_file, "r") as file:
         config = json.load(file)
     return config
+
+
+def get_missing_dates(dates: list, patient_dir: str) -> list:
+    """Return a list of missing dates in the dates list
+
+    Args:
+        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
+        patient_dir (str): patient dir that contains all data,
+            e.g. "./oura/Percept004/"
+
+    Returns:
+        list: ["2023-06-23", "2023-06-24"]
+    """
+    res = []
+    for date in dates:
+        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
+        if not os.path.exists(patient_date_json):
+            res.append(date)
+    return res

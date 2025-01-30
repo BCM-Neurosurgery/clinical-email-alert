@@ -13,19 +13,18 @@ from trbdv0.utils import (
     get_past_dates,
     read_json,
     read_config,
+    get_missing_dates,
 )
 import os
 import logging
 import pytz
 from logging.handlers import RotatingFileHandler
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from trbdv0.send_email import EmailSender
 import argparse
-import numpy as np
 
 
-# Custom formatter class to handle timezone
 class CSTFormatter(logging.Formatter):
     """Logging Formatter to add timestamps in the US Central timezone."""
 
@@ -41,7 +40,6 @@ class CSTFormatter(logging.Formatter):
             return dt.isoformat()
 
 
-# Function to setup logger
 def setup_logger(name, file_path, level=logging.INFO):
     """Setup logger with custom timezone formatter."""
     formatter = CSTFormatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -134,25 +132,6 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
             )
 
             res.append(entry)
-    return res
-
-
-def get_missing_dates(dates: list, patient_dir: str) -> list:
-    """Return a list of missing dates in the dates list
-
-    Args:
-        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
-        patient_dir (str): patient dir that contains all data,
-            e.g. "./oura/Percept004/"
-
-    Returns:
-        list: ["2023-06-23", "2023-06-24"]
-    """
-    res = []
-    for date in dates:
-        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
-        if not os.path.exists(patient_date_json):
-            res.append(date)
     return res
 
 
