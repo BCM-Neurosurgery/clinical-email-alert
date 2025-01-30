@@ -1,4 +1,14 @@
 from datetime import datetime, timedelta
+import json
+
+PHASE_MAPPING = {
+    "1": "Deep Sleep",
+    "2": "Light Sleep",
+    "3": "REM Sleep",
+    "4": "Awake",
+    "non_wear_time": "Non-Wear Time",
+    "steps": "Step Count",
+}
 
 
 # Helper function to parse the date and time
@@ -19,3 +29,64 @@ def format_seconds(seconds: int) -> str:
     td = timedelta(seconds=seconds)
     # Format the hours, minutes, and seconds as a string
     return str(td)
+
+
+def get_todays_date() -> str:
+    """Get date of today
+
+    Returns:
+        str: e.g. "2024-05-01"
+    """
+    today = datetime.today()
+    return today.strftime("%Y-%m-%d")
+
+
+def get_yesterdays_date() -> str:
+    """Get date of yesterday.
+
+    Returns:
+        str: e.g. "2024-04-30"
+    """
+    yesterday = datetime.today() - timedelta(days=1)
+    return yesterday.strftime("%Y-%m-%d")
+
+
+def get_past_dates(end_date: str, past_days: int = 7) -> list:
+    """Get week dates on and before end_date
+
+    Args:
+        end_date (str): e.g. "2023-07-05"
+
+    Returns:
+        list: a list of dates going back for a week on and before end_date
+    """
+    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    date_list = [end_date_dt - timedelta(days=x) for x in range(1, past_days + 1)]
+    return [date.strftime("%Y-%m-%d") for date in date_list]
+
+
+def read_json(json_path: str) -> list:
+    """Load json and return list
+
+    Args:
+        json_path (str): path to json
+
+    Returns:
+        list: each sleep.json contains a list of dicts
+    """
+    with open(json_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def read_config(config_file: str) -> dict:
+    """Read config.json into dict
+
+    Args:
+        config_file (str): path to config file
+
+    Returns:
+        dict: loaded into dictionary
+    """
+    with open(config_file, "r") as file:
+        config = json.load(file)
+    return config
