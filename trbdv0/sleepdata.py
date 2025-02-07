@@ -191,10 +191,11 @@ class SleepData:
             ]
         )
         # Create a figure with two subplots
-        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(26, 10))
+        fig = plt.figure(figsize=(30, 12), constrained_layout=True)
+        gs = fig.add_gridspec(nrows=2, ncols=2)
 
         # Plot sleep distribution on the first subplot
-        ax1 = axes[0][0]
+        ax1 = fig.add_subplot(gs[0, 0])
         color_palette = list(get_cmap("Set2").colors[:4]) + ["lightgray"]
         ax1 = df.plot(
             kind="bar",
@@ -256,7 +257,7 @@ class SleepData:
             for i, day in enumerate(dataframe["day"].unique())
         }
 
-        ax2 = fig.add_subplot(122, projection="polar")
+        ax2 = fig.add_subplot(gs[:, 1], projection="polar")
         ax2.set_theta_direction(-1)
         ax2.set_theta_offset(np.pi / 2.0)
         ax2.set_xticks(np.linspace(0, 2 * np.pi, 24, endpoint=False))
@@ -415,7 +416,7 @@ class SleepData:
         ###########################################
         # EXAMPLE: Let's do our “stacked daily MET” on axes[1,0]
         ###########################################
-        ax = axes[1, 0]
+        ax = fig.add_subplot(gs[1, 0])
 
         # Sort days if you like
         unique_days = sorted(df["day"].unique())
@@ -486,8 +487,7 @@ class SleepData:
 
         # That’s it for the bottom-left subplot (axes[1,0]).
         # The other subplots can stay as you already have them.
-        # plt.tight_layout()
-        plt.show()
+        plt.tight_layout()
 
         # Save the combined figure
         plt.savefig(
