@@ -408,23 +408,14 @@ class SleepData:
 
         # 1) Convert MET Timestamp to a proper datetime and add "day" and "hour" columns.
         df = self.summary_stats["sleep_df"]
-        # Convert the MET Timestamp to a datetime
         df["datetime"] = pd.to_datetime(df["MET Timestamp"])
-        # Extract just the date
         df["day"] = df["datetime"].dt.date
 
-        ###########################################
-        # EXAMPLE: Let's do our “stacked daily MET” on axes[1,0]
-        ###########################################
         ax = fig.add_subplot(gs[1, 0])
-
-        # Sort days if you like
         unique_days = sorted(df["day"].unique())
 
-        # We'll use a vertical scale so each day's line sits in its own “band”
         y_scale = 15
 
-        # We’ll store ticks/labels for the y-axis
         y_ticks = []
         y_labels = []
 
@@ -440,16 +431,12 @@ class SleepData:
             # Convert the list of MET Items into a numpy array
             day_met = np.array(row["MET Items"], dtype=float)
 
-            # If you want zero values to display as gaps, you can replace them with NaN
-            # day_met[day_met == 0.0] = np.nan
-
             # For each MET item, figure out which minute it belongs to (0..N-1),
             # convert to hours by dividing by 60, then add offset_h
             hour_met = np.arange(len(day_met)) / 60.0 + offset_h
 
             # The y-value: i * y_scale is the vertical offset for day i
             # So we do (i*y_scale + day_met).
-            # For a single line, do a normal plot:
             if i == 0:
                 # Provide label for the legend
                 ax.plot(
@@ -468,7 +455,6 @@ class SleepData:
 
         ax.set_xlim([4, 28])
 
-        # Set x-axis ticks and labels
         hours = list(range(4, 29))
         labels = []
         for h in hours:
@@ -481,15 +467,10 @@ class SleepData:
         # Put each day on its own tick
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
-
-        # You can add a legend if you want:
         ax.legend()
 
-        # That’s it for the bottom-left subplot (axes[1,0]).
-        # The other subplots can stay as you already have them.
         plt.tight_layout()
 
-        # Save the combined figure
         plt.savefig(
             os.path.join(
                 out_dir,
