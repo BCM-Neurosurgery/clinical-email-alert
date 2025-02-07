@@ -13,6 +13,7 @@ PHASE_MAPPING = {
     "average_met": "Average MET",
     "met_interval": "MET Interval",
     "met_items": "MET Items",
+    "met_timestamp": "MET Timestamp",
 }
 
 
