@@ -180,12 +180,21 @@ class SleepData:
         """
         Plot sleep distribution and sleep habit polar plot side by side.
         """
-        df = self.summary_stats["sleep_df"].drop(columns=["Step Count", "Total Sleep"])
+        df = self.summary_stats["sleep_df"].drop(
+            columns=[
+                "Step Count",
+                "Total Sleep",
+                "Average MET",
+                "MET Interval",
+                "MET Items",
+                "MET Timestamp",
+            ]
+        )
         # Create a figure with two subplots
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(26, 10))
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(26, 10))
 
         # Plot sleep distribution on the first subplot
-        ax1 = axes[0]
+        ax1 = axes[0][0]
         color_palette = list(get_cmap("Set2").colors[:4]) + ["lightgray"]
         ax1 = df.plot(
             kind="bar",
@@ -395,6 +404,83 @@ class SleepData:
         ]
         ax2.legend(custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1, 1))
         plt.tight_layout()
+
+        # 1) Convert MET Timestamp to a proper datetime and add "day" and "hour" columns.
+        df = self.summary_stats["sleep_df"]
+        # Convert the MET Timestamp to a datetime
+        df["datetime"] = pd.to_datetime(df["MET Timestamp"])
+        # Extract just the date
+        df["day"] = df["datetime"].dt.date
+
+        ###########################################
+        # EXAMPLE: Let's do our “stacked daily MET” on axes[1,0]
+        ###########################################
+        ax = axes[1, 0]
+
+        # Sort days if you like
+        unique_days = sorted(df["day"].unique())
+
+        # We'll use a vertical scale so each day's line sits in its own “band”
+        y_scale = 15
+
+        # We’ll store ticks/labels for the y-axis
+        y_ticks = []
+        y_labels = []
+
+        # Loop over each day
+        for i, day in enumerate(unique_days):
+            # If each day is guaranteed to appear exactly once in the df, just pick that row:
+            row = df.loc[df["day"] == day].iloc[0]  # get the single row for this day
+
+            # day_offset is the hour/minute at which the first MET item starts
+            start_ts = row["datetime"]
+            offset_h = start_ts.hour + start_ts.minute / 60.0 + start_ts.second / 3600.0
+
+            # Convert the list of MET Items into a numpy array
+            day_met = np.array(row["MET Items"], dtype=float)
+
+            # If you want zero values to display as gaps, you can replace them with NaN
+            # day_met[day_met == 0.0] = np.nan
+
+            # For each MET item, figure out which minute it belongs to (0..N-1),
+            # convert to hours by dividing by 60, then add offset_h
+            hour_met = np.arange(len(day_met)) / 60.0 + offset_h
+
+            # The y-value: i * y_scale is the vertical offset for day i
+            # So we do (i*y_scale + day_met).
+            # For a single line, do a normal plot:
+            if i == 0:
+                # Provide label for the legend
+                ax.plot(
+                    hour_met,
+                    i * y_scale + day_met,
+                    color="mediumblue",
+                    alpha=0.67,
+                    label="Oura MET Score",
+                )
+            else:
+                ax.plot(hour_met, i * y_scale + day_met, color="mediumblue", alpha=0.67)
+
+            # Keep track of where to place the day label on the y-axis
+            y_ticks.append(i * y_scale)
+            y_labels.append(day)
+
+        # Now set up the axis limits, labels, etc.
+        ax.set_xlim([0, 24])  # typical “hour of day” range
+        ax.set_xlabel("Hour of Day")
+        ax.set_ylabel("Stacked Days (MET Scores)")
+
+        # Put each day on its own tick
+        ax.set_yticks(y_ticks)
+        ax.set_yticklabels(y_labels)
+
+        # You can add a legend if you want:
+        ax.legend()
+
+        # That’s it for the bottom-left subplot (axes[1,0]).
+        # The other subplots can stay as you already have them.
+        # plt.tight_layout()
+        plt.show()
 
         # Save the combined figure
         plt.savefig(
