@@ -207,7 +207,6 @@ class SleepData:
         )
         ax1.set_title("Distribution of Sleep Phases per Day")
         ax1.set_ylabel("Hours")
-        ax1.set_xlabel("Day")
         ax1.set_xticks(range(len(df)))
         ax1.set_xticklabels(df.index, rotation=45)
 
@@ -467,6 +466,7 @@ class SleepData:
         # Put each day on its own tick
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
+        ax.set_title("MET Scores per Day")
         ax.legend()
 
         plt.tight_layout()
