@@ -264,6 +264,7 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
             "Yesterday's Sleep": f"{patient_stats['yesterday_sleep']:.1f}",
             "Average Steps": f"{patient_stats.get('average_steps', 'N/A'):.0f}",
             "Yesterday's Steps": f"{patient_stats.get('yesterday_steps', 'N/A'):.0f}",
+            "Yesterday's Average MET": f"{patient_stats.get('yesterday_average_met', 'N/A'):.2f}",
         }
 
         # Add HTML highlighting based on warning types
@@ -278,6 +279,10 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
         if "steps_variation" in warning_types:
             row["Yesterday's Steps"] = (
                 f'<span style="background-color: #ff5252">{row["Yesterday\'s Steps"]}</span>'
+            )
+        if "met_variation" in warning_types:
+            row["Yesterday's Average MET"] = (
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s MET"]}</span>'
             )
 
         df_rows.append(row)
