@@ -465,11 +465,18 @@ class SleepData:
             y_ticks.append(i * y_scale)
             y_labels.append(day)
 
-        # Now set up the axis limits, labels, etc.
-        ax.set_xlim([0, 24])  # typical “hour of day” range
-        ax.set_xlabel("Hour of Day")
-        ax.set_ylabel("Stacked Days (MET Scores)")
+        ax.set_xlim([4, 28])
 
+        # Set x-axis ticks and labels
+        hours = list(range(4, 29))
+        labels = []
+        for h in hours:
+            hour = h if h <= 12 else h - 12 if h < 24 else h - 24
+            ampm = "am" if h < 12 or h >= 24 else "pm"
+            labels.append(f"{hour}{ampm}")
+
+        ax.set_xticks(hours)
+        ax.set_xticklabels(labels, rotation=45)
         # Put each day on its own tick
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
