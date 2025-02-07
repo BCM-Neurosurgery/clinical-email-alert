@@ -102,6 +102,7 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
                 "non_wear_time": 0,
                 "timestamp": "",
                 "steps": 0,
+                "met": {},
             }
 
             # Find corresponding activity entry with the same day
@@ -112,7 +113,13 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
             entry.update(
                 {
                     key: matching_activity.get(key, entry[key])
-                    for key in ["class_5_min", "non_wear_time", "timestamp", "steps"]
+                    for key in [
+                        "class_5_min",
+                        "non_wear_time",
+                        "timestamp",
+                        "steps",
+                        "met",
+                    ]
                 }
             )
 
