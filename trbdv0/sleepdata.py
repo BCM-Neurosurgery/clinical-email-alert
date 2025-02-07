@@ -6,10 +6,11 @@ from matplotlib.cm import get_cmap
 import os
 import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
-from trbdv0.utils import (
+from utils import (
     get_todays_date,
     get_yesterdays_date,
     PHASE_MAPPING,
+    calculate_average_met,
 )
 
 # TODO: how to define a day?
@@ -61,45 +62,71 @@ class SleepData:
         return res
 
     def get_summary_stats(self) -> dict:
-        """Get summary stats of sleep data
-
-        Returns:
-            dict: {
-                "patient": "Percept010",
-                "date_range": ("2023-09-01", "2023-09-14"), # available range in sleep data
-                "today": "2023-09-14", # might not be in the data
-                "yesterday": "2023-09-13",
-                "yesterday_sleep": 7.5,
-                "average_sleep": 7.5, # average sleep in sleep data
-                "sleep_df": pd.DataFrame,
-            }
-        """
+        """Get summary stats of sleep data"""
         # Collect counters by day
         sleep_counts = {}
         for entry in self.data:
             day = entry["day"]
-            if day not in sleep_counts:
-                sleep_counts[day] = Counter()
-            sleep_counts[day] += Counter(entry.get("sleep_phase_5_min", ""))
-            sleep_counts[day]["non_wear_time"] = entry.get("non_wear_time", 0) / 3600
-            sleep_counts[day]["steps"] = entry.get("steps", 0)
 
-        # Convert 5-min increments to hours
-        for day, counter in sleep_counts.items():
-            for phase in list(counter.keys()):
-                if phase not in ["non_wear_time", "steps"]:
-                    counter[phase] = (counter[phase] * 5) / 60
+            if day not in sleep_counts:
+                sleep_counts[day] = {
+                    "phases": Counter(),
+                    "non_wear_time": 0,
+                    "steps": 0,
+                    "average_met": 0,
+                    "met_interval": 0,
+                    "met_items": [],
+                    "met_timestamp": "",
+                }
+
+            # Update the phase counter
+            sleep_counts[day]["phases"] += Counter(entry.get("sleep_phase_5_min", ""))
+
+            # Accumulate or overwrite the other fields
+            sleep_counts[day]["non_wear_time"] += entry.get("non_wear_time", 0) / 3600
+            sleep_counts[day]["steps"] += entry.get("steps", 0)
+            sleep_counts[day]["average_met"] = calculate_average_met(entry)
+
+            met_data = entry.get("met", {})
+            sleep_counts[day]["met_interval"] = met_data.get("interval", 0)
+            sleep_counts[day]["met_items"] = met_data.get("items", [])
+            sleep_counts[day]["met_timestamp"] = met_data.get("timestamp", "")
+
+        # Convert 5-min increments in phases to hours
+        for day, day_data in sleep_counts.items():
+            for phase, count in day_data["phases"].items():
+                # Each count is a number of 5-min increments
+                day_data["phases"][phase] = (count * 5) / 60.0
 
         # Flatten data into a DataFrame
-        all_keys = ["1", "2", "3", "4", "non_wear_time", "steps"]
-        flattened_data = {
-            d: {k: sleep_counts[d].get(k, np.nan) for k in all_keys}
-            for d in sleep_counts
-        }
+        # Define which phase keys we care about
+        phase_keys = ["1", "2", "3", "4"]  # "1"=Deep, "2"=Light, "3"=REM, "4"=Awake
+        other_keys = [
+            "non_wear_time",
+            "steps",
+            "average_met",
+            "met_interval",
+            "met_items",
+            "met_timestamp",
+        ]
+
+        flattened_data = {}
+        for d, day_data in sleep_counts.items():
+            flattened_row = {}
+            for ph in phase_keys:
+                flattened_row[ph] = day_data["phases"].get(ph, 0.0)
+
+            for k in other_keys:
+                flattened_row[k] = day_data.get(k, np.nan)
+
+            flattened_data[d] = flattened_row
+
         df = pd.DataFrame.from_dict(flattened_data, orient="index").sort_index()
+
+        # Rename columns using PHASE_MAPPING
         df.columns = [PHASE_MAPPING.get(col, f"Phase {col}") for col in df.columns]
 
-        # Reorder columns and calculate total sleep
+        # Reorder columns and fill missing
         column_order = [
             "Deep Sleep",
             "Light Sleep",
@@ -107,11 +134,14 @@ class SleepData:
             "Awake",
             "Non-Wear Time",
             "Step Count",
+            "Average MET",
+            "MET Interval",
+            "MET Items",
+            "MET Timestamp",
         ]
         df = df.reindex(columns=column_order).fillna(0)
         df["Total Sleep"] = df[["Deep Sleep", "Light Sleep", "REM Sleep"]].sum(axis=1)
 
-        # Get yesterday's sleep and average
         today_date = get_todays_date()
         yesterday_date = get_yesterdays_date()
         yesterday_sleep = (
@@ -119,21 +149,30 @@ class SleepData:
             if yesterday_date in df.index
             else np.nan
         )
-        yesterday_step = (
+        yesterday_steps = (
             df.loc[yesterday_date, "Step Count"]
+            if yesterday_date in df.index
+            else np.nan
+        )
+        yesterday_average_met = (
+            df.loc[yesterday_date, "Average MET"]
             if yesterday_date in df.index
             else np.nan
         )
 
         return {
             "patient": self.patient,
-            "date_range": (df.index.min(), df.index.max()),
+            "date_range": (
+                (df.index.min(), df.index.max()) if not df.empty else (None, None)
+            ),
             "today": today_date,
             "yesterday": yesterday_date,
             "yesterday_sleep": yesterday_sleep,
-            "yesterday_steps": yesterday_step,
+            "yesterday_steps": yesterday_steps,
             "average_sleep": df["Total Sleep"].mean() if not df.empty else np.nan,
             "average_steps": df["Step Count"].mean() if not df.empty else np.nan,
+            "yesterday_average_met": yesterday_average_met,
+            "average_met": df["Average MET"].mean() if not df.empty else np.nan,
             "sleep_df": df,
         }
 
