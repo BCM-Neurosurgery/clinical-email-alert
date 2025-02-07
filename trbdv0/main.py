@@ -6,8 +6,8 @@ Usage
 - python main.py
 """
 
-from trbdv0.sleepdata import SleepData
-from trbdv0.utils import (
+from sleepdata import SleepData
+from utils import (
     get_todays_date,
     get_yesterdays_date,
     get_past_dates,
@@ -151,6 +151,7 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
             - 'low_sleep': Sleep duration < 5 hours
             - 'sleep_variation': Abnormal sleep pattern
             - 'steps_variation': Abnormal steps pattern
+            - 'met_variation': Abnormal MET pattern
     """
     warnings = []
     sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
@@ -188,6 +189,19 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
         )
     ):
         warnings.append(("Steps Variation", "steps_variation"))
+
+    # Met variation warning
+    if (
+        not pd.isna(patient_stats.get("yesterday_average_met"))
+        and not pd.isna(patient_stats.get("average_met"))
+        and patient_stats["average_met"] > 0
+        and (
+            patient_stats["yesterday_average_met"] < 0.75 * patient_stats["average_met"]
+            or patient_stats["yesterday_average_met"]
+            > 1.25 * patient_stats["average_met"]
+        )
+    ):
+        warnings.append(("MET Variation", "met_variation"))
 
     return warnings
 
