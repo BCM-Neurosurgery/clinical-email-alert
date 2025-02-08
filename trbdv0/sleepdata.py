@@ -12,6 +12,7 @@ from utils import (
     PHASE_MAPPING,
     calculate_average_met,
 )
+from datetime import datetime
 
 # TODO: how to define a day?
 
@@ -411,7 +412,10 @@ class SleepData:
 
         # 1) Convert MET Timestamp to a proper datetime and add "day" and "hour" columns.
         df = self.summary_stats["sleep_df"]
-        df["datetime"] = pd.to_datetime(df["MET Timestamp"])
+        # Parse timestamps while ignoring the timezone offsets
+        df["datetime"] = df["MET Timestamp"].apply(
+            lambda x: datetime.strptime(x[:19], "%Y-%m-%dT%H:%M:%S")
+        )
         df["day"] = df["datetime"].dt.date
 
         ax = fig.add_subplot(gs[1, 0])
