@@ -412,7 +412,6 @@ class SleepData:
         ax2.legend(custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1, 1))
         plt.tight_layout()
 
-        # 1) Convert MET Timestamp to a proper datetime and add "day" and "hour" columns.
         df = self.summary_stats["sleep_df"]
         # Parse timestamps while ignoring the timezone offsets
         df["datetime"] = df["MET Timestamp"].apply(
@@ -480,9 +479,8 @@ class SleepData:
         hours = list(range(4, 29))
         labels = []
         for h in hours:
-            hour = h if h <= 12 else h - 12 if h < 24 else h - 24
-            ampm = "am" if h < 12 or h >= 24 else "pm"
-            labels.append(f"{hour}{ampm}")
+            hour = h if h < 24 else h - 24
+            labels.append(f"{hour}:00")
 
         ax.set_xticks(hours)
         ax.set_xticklabels(labels, rotation=45)
