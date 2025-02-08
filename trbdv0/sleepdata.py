@@ -84,6 +84,7 @@ class SleepData:
 
             # Accumulate or overwrite the other fields
             sleep_counts[day]["non_wear_time"] += entry.get("non_wear_time", 0) / 3600
+            sleep_counts[day]["class_5_mins"] = entry.get("class_5_min", "")
             sleep_counts[day]["steps"] += entry.get("steps", 0)
             sleep_counts[day]["average_met"] = calculate_average_met(entry)
 
@@ -103,6 +104,7 @@ class SleepData:
         phase_keys = ["1", "2", "3", "4"]  # "1"=Deep, "2"=Light, "3"=REM, "4"=Awake
         other_keys = [
             "non_wear_time",
+            "class_5_mins",
             "steps",
             "average_met",
             "met_interval",
@@ -133,6 +135,7 @@ class SleepData:
             "REM Sleep",
             "Awake",
             "Non-Wear Time",
+            "Activity Classification",
             "Step Count",
             "Average MET",
             "MET Interval",
@@ -188,6 +191,7 @@ class SleepData:
                 "MET Interval",
                 "MET Items",
                 "MET Timestamp",
+                "Activity Classification",
             ]
         )
         # Create a figure with two subplots
@@ -421,32 +425,45 @@ class SleepData:
         # Loop over each day
         for i, day in enumerate(unique_days):
             # If each day is guaranteed to appear exactly once in the df, just pick that row:
-            row = df.loc[df["day"] == day].iloc[0]  # get the single row for this day
+            row = df.loc[df["day"] == day].iloc[0]
 
             # day_offset is the hour/minute at which the first MET item starts
             start_ts = row["datetime"]
             offset_h = start_ts.hour + start_ts.minute / 60.0 + start_ts.second / 3600.0
-
-            # Convert the list of MET Items into a numpy array
             day_met = np.array(row["MET Items"], dtype=float)
 
             # For each MET item, figure out which minute it belongs to (0..N-1),
             # convert to hours by dividing by 60, then add offset_h
             hour_met = np.arange(len(day_met)) / 60.0 + offset_h
 
+            # Convert Activity Classification (5-min intervals) to an array
+            activity_class = np.array(list(row["Activity Classification"]), dtype=int)
+
+            # Expand each classification value over 5 consecutive minutes
+            expanded_activity_class = np.repeat(activity_class, 5)
+
+            # Identify non-wear periods (where classification is 0)
+            non_wear_mask = expanded_activity_class == 0
+
             # The y-value: i * y_scale is the vertical offset for day i
             # So we do (i*y_scale + day_met).
-            if i == 0:
-                # Provide label for the legend
-                ax.plot(
-                    hour_met,
-                    i * y_scale + day_met,
-                    color="mediumblue",
-                    alpha=0.67,
-                    label="Oura MET Score",
-                )
-            else:
-                ax.plot(hour_met, i * y_scale + day_met, color="mediumblue", alpha=0.67)
+            # Plot MET data
+            ax.plot(
+                hour_met,
+                i * y_scale + day_met,
+                color="mediumblue",
+                alpha=0.67,
+                label="Oura MET Score" if i == 0 else "",
+            )
+
+            # Overlay non-wear regions
+            ax.scatter(
+                hour_met[non_wear_mask],
+                (i * y_scale + day_met)[non_wear_mask],
+                color="gray",
+                alpha=0.5,
+                label="Non-Wear" if i == 0 else "",
+            )
 
             # Keep track of where to place the day label on the y-axis
             y_ticks.append(i * y_scale)

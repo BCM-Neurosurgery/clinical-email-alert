@@ -14,6 +14,7 @@ PHASE_MAPPING = {
     "met_interval": "MET Interval",
     "met_items": "MET Items",
     "met_timestamp": "MET Timestamp",
+    "class_5_mins": "Activity Classification",
 }
 
 
