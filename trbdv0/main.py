@@ -209,41 +209,36 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
 def generate_subject_line(all_patient_stats: list) -> str:
     """Generate an email subject line summarizing all patient warnings.
 
-    Creates a subject line that includes warning types and affected patient names.
-    If no warnings exist, shows [All Clear].
-
     Args:
-        all_patient_stats (list): List of dictionaries containing patient stats:
-            [
-                {
-                    "patient": str,
-                    "average_sleep": float,
-                    "average_steps": float,
-                    "yesterday_sleep": float,
-                    "yesterday_steps": float,
-                    "sleep_df": pd.DataFrame
-                },
-                ...
-            ]
+        all_patient_stats (list): List of dictionaries containing patient stats.
 
     Returns:
         str: Formatted subject line in format:
-            "[Warning: type1, type2] for Patients: pat1, pat2 on YYYY-MM-DD"
+            "[Warning: type1 (pat1, pat2); type2 (pat3)] on YYYY-MM-DD"
             or "[All Clear] for Patients: pat1, pat2 on YYYY-MM-DD"
     """
-    warnings = set()
+    warnings_by_patient = {}
     yesterday_date = get_yesterdays_date()
-    patient_list = [patient_stats["patient"] for patient_stats in all_patient_stats]
 
     for patient_stats in all_patient_stats:
+        patient_name = patient_stats["patient"]
         patient_warnings = get_patient_warnings(patient_stats, yesterday_date)
-        warnings.update(warning[0] for warning in patient_warnings)
 
-    status = (
-        "[All Clear]" if not warnings else f"[Warning: {', '.join(sorted(warnings))}]"
+        if patient_warnings:
+            for warning in patient_warnings:
+                warnings_by_patient.setdefault(warning[0], []).append(patient_name)
+
+    if not warnings_by_patient:
+        patients_str = ", ".join([p["patient"] for p in all_patient_stats])
+        return f"[All Clear] for Patients: {patients_str} on {yesterday_date}"
+
+    # Format warnings to show which patients are affected by each type
+    warnings_str = "; ".join(
+        f"{warning} ({', '.join(sorted(patients))})"
+        for warning, patients in sorted(warnings_by_patient.items())
     )
-    patients_str = ", ".join(patient_list)
-    return f"{status} for Patients: {patients_str} on {yesterday_date}"
+
+    return f"[Warning: {warnings_str}] on {yesterday_date}"
 
 
 def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> str:
