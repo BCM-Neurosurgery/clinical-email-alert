@@ -282,7 +282,7 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
             )
         if "met_variation" in warning_types:
             row["Yesterday's Average MET"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s MET"]}</span>'
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Average MET"]}</span>'
             )
 
         df_rows.append(row)
