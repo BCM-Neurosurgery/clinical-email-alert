@@ -484,7 +484,7 @@ class SleepData:
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
         ax.set_title("MET Scores per Day")
-        ax.legend()
+        ax.legend(loc="upper right")
 
         plt.tight_layout()
 
