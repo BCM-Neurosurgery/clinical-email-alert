@@ -240,7 +240,11 @@ class SleepData:
             label=f"Average Sleep ({average_sleep:.2f} hrs)",
         )
 
-        ax1.legend(title="Sleep Phases and Averages")
+        ax1.legend(
+            title="Sleep Phases and Averages",
+            loc="upper left",  # Aligns inside but we move it outside with bbox_to_anchor
+            bbox_to_anchor=(1, 1),  # Moves it just outside the right side
+        )
 
         # Plot spiral chart
         dataframe = pd.DataFrame(self.data)
@@ -488,7 +492,11 @@ class SleepData:
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
         ax.set_title("MET Scores per Day")
-        ax.legend(loc="upper right")
+        ax.legend(
+            title="MET Scores per Day",
+            loc="upper left",
+            bbox_to_anchor=(1, 1),
+        )
 
         plt.tight_layout()
 
