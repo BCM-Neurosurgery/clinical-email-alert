@@ -195,6 +195,8 @@ class SleepData:
                 "Activity Classification",
             ]
         )
+        if df.empty:
+            return
         # Create a figure with two subplots
         fig = plt.figure(figsize=(30, 12), constrained_layout=True)
         gs = fig.add_gridspec(nrows=2, ncols=2)
