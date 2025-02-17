@@ -82,7 +82,7 @@ def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> l
 
         if not os.path.exists(patient_date_json):
             logger.error(f"{date} sleep data not found.")
-            sleep_data = []
+            sleep_data = [{"day": date}]
         else:
             sleep_data = read_json(patient_date_json)
 

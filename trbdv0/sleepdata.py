@@ -164,12 +164,13 @@ class SleepData:
             if yesterday_date in df.index
             else np.nan
         )
+        original_df = df.copy()
+        date_range = (df.index.min(), df.index.max()) if not df.empty else (None, None)
+        df = df[df.any(axis=1)]
 
         return {
             "patient": self.patient,
-            "date_range": (
-                (df.index.min(), df.index.max()) if not df.empty else (None, None)
-            ),
+            "date_range": date_range,
             "today": today_date,
             "yesterday": yesterday_date,
             "yesterday_sleep": yesterday_sleep,
@@ -178,7 +179,7 @@ class SleepData:
             "average_steps": df["Step Count"].mean() if not df.empty else np.nan,
             "yesterday_average_met": yesterday_average_met,
             "average_met": df["Average MET"].mean() if not df.empty else np.nan,
-            "sleep_df": df,
+            "sleep_df": original_df,
         }
 
     def plot_combined_sleep_plots(self, out_dir: str):
