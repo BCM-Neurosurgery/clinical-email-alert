@@ -87,12 +87,13 @@ class SleepData:
             sleep_counts[day]["non_wear_time"] += entry.get("non_wear_time", 0) / 3600
             sleep_counts[day]["class_5_mins"] = entry.get("class_5_min", "")
             sleep_counts[day]["steps"] += entry.get("steps", 0)
-            sleep_counts[day]["average_met"] = calculate_average_met(entry)
 
             met_data = entry.get("met", {})
             sleep_counts[day]["met_interval"] = met_data.get("interval", 0)
             sleep_counts[day]["met_items"] = met_data.get("items", [])
             sleep_counts[day]["met_timestamp"] = met_data.get("timestamp", "")
+            if met_data:
+                sleep_counts[day]["average_met"] = calculate_average_met(entry)
 
         # Convert 5-min increments in phases to hours
         for day, day_data in sleep_counts.items():
@@ -418,9 +419,21 @@ class SleepData:
 
         df = self.summary_stats["sleep_df"]
         # Parse timestamps while ignoring the timezone offsets
-        df["datetime"] = df["MET Timestamp"].apply(
-            lambda x: datetime.strptime(x[:19], "%Y-%m-%dT%H:%M:%S")
-        )
+        df = df.dropna(subset=["MET Timestamp"])
+
+        # Ensure valid timestamps
+        def safe_parse_timestamp(x):
+            try:
+                return (
+                    datetime.strptime(x[:19], "%Y-%m-%dT%H:%M:%S")
+                    if pd.notna(x) and x
+                    else None
+                )
+            except ValueError:
+                return None
+
+        df["datetime"] = df["MET Timestamp"].apply(safe_parse_timestamp)
+        df = df.dropna(subset=["datetime"])
         df["day"] = df["datetime"].dt.date
 
         ax = fig.add_subplot(gs[1, 0])
@@ -450,6 +463,18 @@ class SleepData:
 
             # Expand each classification value over 5 consecutive minutes
             expanded_activity_class = np.repeat(activity_class, 5)
+
+            # Ensure the length matches `day_met`
+            expected_length = len(day_met)
+            if len(expanded_activity_class) < expected_length:
+                expanded_activity_class = np.pad(
+                    expanded_activity_class,
+                    (0, expected_length - len(expanded_activity_class)),
+                    constant_values=0,
+                )
+            elif len(expanded_activity_class) > expected_length:
+                # Trim if somehow longer
+                expanded_activity_class = expanded_activity_class[:expected_length]
 
             # Identify non-wear periods (where classification is 0)
             non_wear_mask = expanded_activity_class == 0
