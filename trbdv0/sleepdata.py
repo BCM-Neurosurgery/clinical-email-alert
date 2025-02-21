@@ -173,11 +173,13 @@ class SleepData:
             "date_range": date_range,
             "today": today_date,
             "yesterday": yesterday_date,
-            "yesterday_sleep": yesterday_sleep,
-            "yesterday_steps": yesterday_steps,
+            "yesterday_sleep": np.nan if not yesterday_sleep else yesterday_sleep,
+            "yesterday_steps": np.nan if not yesterday_steps else yesterday_steps,
             "average_sleep": df["Total Sleep"].mean() if not df.empty else np.nan,
             "average_steps": df["Step Count"].mean() if not df.empty else np.nan,
-            "yesterday_average_met": yesterday_average_met,
+            "yesterday_average_met": (
+                np.nan if not yesterday_average_met else yesterday_average_met
+            ),
             "average_met": df["Average MET"].mean() if not df.empty else np.nan,
             "sleep_df": original_df,
         }

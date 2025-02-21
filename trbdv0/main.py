@@ -162,9 +162,15 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
     elif yesterday_date not in sleep_df.index:
         warnings.append(("Missing Sleep Data", "missing_data"))
 
-    # Sleep duration warning
-    if patient_stats["yesterday_sleep"] < 5:
+    if pd.isna(patient_stats["yesterday_sleep"]):
+        warnings.append(("Missing Yesterday's Sleep Data", "missing_data"))
+    elif patient_stats["yesterday_sleep"] < 5:
         warnings.append(("Sleep < 5 hours", "low_sleep"))
+
+    if pd.isna(patient_stats.get("yesterday_steps")):
+        warnings.append(("Missing Yesterday's Steps Data", "missing_data"))
+    if pd.isna(patient_stats.get("yesterday_average_met")):
+        warnings.append(("Missing Yesterday's MET Data", "missing_data"))
 
     # Sleep variation warning
     if (
@@ -262,6 +268,18 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
             "Yesterday's Average MET": f"{patient_stats.get('yesterday_average_met', 'N/A'):.2f}",
         }
 
+        if pd.isna(patient_stats.get("yesterday_steps")):
+            row["Yesterday's Steps"] = (
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Steps"]}</span>'
+            )
+        if pd.isna(patient_stats.get("yesterday_average_met")):
+            row["Yesterday's Average MET"] = (
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Average MET"]}</span>'
+            )
+        if pd.isna(patient_stats.get("yesterday_sleep")):
+            row["Yesterday's Sleep"] = (
+                f'<span style="background-color: #ff5252">{row["Yesterday\'s Sleep"]}</span>'
+            )
         # Add HTML highlighting based on warning types
         if "missing_data" in warning_types:
             row["Missing Days"] = (
