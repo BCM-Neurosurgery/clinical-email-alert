@@ -6,11 +6,13 @@ from matplotlib.cm import get_cmap
 import os
 import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
-from trbdv0.utils import (
+from utils import (
     get_todays_date,
     get_yesterdays_date,
     PHASE_MAPPING,
+    calculate_average_met,
 )
+from datetime import datetime
 
 # TODO: how to define a day?
 
@@ -61,57 +63,90 @@ class SleepData:
         return res
 
     def get_summary_stats(self) -> dict:
-        """Get summary stats of sleep data
-
-        Returns:
-            dict: {
-                "patient": "Percept010",
-                "date_range": ("2023-09-01", "2023-09-14"), # available range in sleep data
-                "today": "2023-09-14", # might not be in the data
-                "yesterday": "2023-09-13",
-                "yesterday_sleep": 7.5,
-                "average_sleep": 7.5, # average sleep in sleep data
-                "sleep_df": pd.DataFrame,
-            }
-        """
+        """Get summary stats of sleep data"""
         # Collect counters by day
         sleep_counts = {}
         for entry in self.data:
             day = entry["day"]
-            if day not in sleep_counts:
-                sleep_counts[day] = Counter()
-            sleep_counts[day] += Counter(entry.get("sleep_phase_5_min", ""))
-            sleep_counts[day]["non_wear_time"] = entry.get("non_wear_time", 0) / 3600
-            sleep_counts[day]["steps"] = entry.get("steps", 0)
 
-        # Convert 5-min increments to hours
-        for day, counter in sleep_counts.items():
-            for phase in list(counter.keys()):
-                if phase not in ["non_wear_time", "steps"]:
-                    counter[phase] = (counter[phase] * 5) / 60
+            if day not in sleep_counts:
+                sleep_counts[day] = {
+                    "phases": Counter(),
+                    "non_wear_time": 0,
+                    "steps": 0,
+                    "average_met": 0,
+                    "met_interval": 0,
+                    "met_items": [],
+                    "met_timestamp": "",
+                }
+
+            # Update the phase counter
+            sleep_counts[day]["phases"] += Counter(entry.get("sleep_phase_5_min", ""))
+
+            # Accumulate or overwrite the other fields
+            sleep_counts[day]["non_wear_time"] += entry.get("non_wear_time", 0) / 3600
+            sleep_counts[day]["class_5_mins"] = entry.get("class_5_min", "")
+            sleep_counts[day]["steps"] += entry.get("steps", 0)
+
+            met_data = entry.get("met", {})
+            sleep_counts[day]["met_interval"] = met_data.get("interval", 0)
+            sleep_counts[day]["met_items"] = met_data.get("items", [])
+            sleep_counts[day]["met_timestamp"] = met_data.get("timestamp", "")
+            if met_data:
+                sleep_counts[day]["average_met"] = calculate_average_met(entry)
+
+        # Convert 5-min increments in phases to hours
+        for day, day_data in sleep_counts.items():
+            for phase, count in day_data["phases"].items():
+                # Each count is a number of 5-min increments
+                day_data["phases"][phase] = (count * 5) / 60.0
 
         # Flatten data into a DataFrame
-        all_keys = ["1", "2", "3", "4", "non_wear_time", "steps"]
-        flattened_data = {
-            d: {k: sleep_counts[d].get(k, np.nan) for k in all_keys}
-            for d in sleep_counts
-        }
+        # Define which phase keys we care about
+        phase_keys = ["1", "2", "3", "4"]  # "1"=Deep, "2"=Light, "3"=REM, "4"=Awake
+        other_keys = [
+            "non_wear_time",
+            "class_5_mins",
+            "steps",
+            "average_met",
+            "met_interval",
+            "met_items",
+            "met_timestamp",
+        ]
+
+        flattened_data = {}
+        for d, day_data in sleep_counts.items():
+            flattened_row = {}
+            for ph in phase_keys:
+                flattened_row[ph] = day_data["phases"].get(ph, 0.0)
+
+            for k in other_keys:
+                flattened_row[k] = day_data.get(k, np.nan)
+
+            flattened_data[d] = flattened_row
+
         df = pd.DataFrame.from_dict(flattened_data, orient="index").sort_index()
+
+        # Rename columns using PHASE_MAPPING
         df.columns = [PHASE_MAPPING.get(col, f"Phase {col}") for col in df.columns]
 
-        # Reorder columns and calculate total sleep
+        # Reorder columns and fill missing
         column_order = [
             "Deep Sleep",
             "Light Sleep",
             "REM Sleep",
             "Awake",
             "Non-Wear Time",
+            "Activity Classification",
             "Step Count",
+            "Average MET",
+            "MET Interval",
+            "MET Items",
+            "MET Timestamp",
         ]
         df = df.reindex(columns=column_order).fillna(0)
         df["Total Sleep"] = df[["Deep Sleep", "Light Sleep", "REM Sleep"]].sum(axis=1)
 
-        # Get yesterday's sleep and average
         today_date = get_todays_date()
         yesterday_date = get_yesterdays_date()
         yesterday_sleep = (
@@ -119,34 +154,59 @@ class SleepData:
             if yesterday_date in df.index
             else np.nan
         )
-        yesterday_step = (
+        yesterday_steps = (
             df.loc[yesterday_date, "Step Count"]
             if yesterday_date in df.index
             else np.nan
         )
+        yesterday_average_met = (
+            df.loc[yesterday_date, "Average MET"]
+            if yesterday_date in df.index
+            else np.nan
+        )
+        original_df = df.copy()
+        date_range = (df.index.min(), df.index.max()) if not df.empty else (None, None)
+        df = df[df.any(axis=1)]
 
         return {
             "patient": self.patient,
-            "date_range": (df.index.min(), df.index.max()),
+            "date_range": date_range,
             "today": today_date,
             "yesterday": yesterday_date,
-            "yesterday_sleep": yesterday_sleep,
-            "yesterday_steps": yesterday_step,
+            "yesterday_sleep": np.nan if not yesterday_sleep else yesterday_sleep,
+            "yesterday_steps": np.nan if not yesterday_steps else yesterday_steps,
             "average_sleep": df["Total Sleep"].mean() if not df.empty else np.nan,
             "average_steps": df["Step Count"].mean() if not df.empty else np.nan,
-            "sleep_df": df,
+            "yesterday_average_met": (
+                np.nan if not yesterday_average_met else yesterday_average_met
+            ),
+            "average_met": df["Average MET"].mean() if not df.empty else np.nan,
+            "sleep_df": original_df,
         }
 
     def plot_combined_sleep_plots(self, out_dir: str):
         """
         Plot sleep distribution and sleep habit polar plot side by side.
         """
-        df = self.summary_stats["sleep_df"].drop(columns=["Step Count", "Total Sleep"])
+        df = self.summary_stats["sleep_df"].drop(
+            columns=[
+                "Step Count",
+                "Total Sleep",
+                "Average MET",
+                "MET Interval",
+                "MET Items",
+                "MET Timestamp",
+                "Activity Classification",
+            ]
+        )
+        if df.empty:
+            return
         # Create a figure with two subplots
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(26, 10))
+        fig = plt.figure(figsize=(30, 12), constrained_layout=True)
+        gs = fig.add_gridspec(nrows=2, ncols=2)
 
         # Plot sleep distribution on the first subplot
-        ax1 = axes[0]
+        ax1 = fig.add_subplot(gs[0, 0])
         color_palette = list(get_cmap("Set2").colors[:4]) + ["lightgray"]
         ax1 = df.plot(
             kind="bar",
@@ -158,7 +218,6 @@ class SleepData:
         )
         ax1.set_title("Distribution of Sleep Phases per Day")
         ax1.set_ylabel("Hours")
-        ax1.set_xlabel("Day")
         ax1.set_xticks(range(len(df)))
         ax1.set_xticklabels(df.index, rotation=45)
 
@@ -185,7 +244,11 @@ class SleepData:
             label=f"Average Sleep ({average_sleep:.2f} hrs)",
         )
 
-        ax1.legend(title="Sleep Phases and Averages")
+        ax1.legend(
+            title="Sleep Phases and Averages",
+            loc="upper left",  # Aligns inside but we move it outside with bbox_to_anchor
+            bbox_to_anchor=(1, 1),  # Moves it just outside the right side
+        )
 
         # Plot spiral chart
         dataframe = pd.DataFrame(self.data)
@@ -208,7 +271,7 @@ class SleepData:
             for i, day in enumerate(dataframe["day"].unique())
         }
 
-        ax2 = fig.add_subplot(122, projection="polar")
+        ax2 = fig.add_subplot(gs[:, 1], projection="polar")
         ax2.set_theta_direction(-1)
         ax2.set_theta_offset(np.pi / 2.0)
         ax2.set_xticks(np.linspace(0, 2 * np.pi, 24, endpoint=False))
@@ -357,7 +420,114 @@ class SleepData:
         ax2.legend(custom_lines, custom_labels, loc="upper left", bbox_to_anchor=(1, 1))
         plt.tight_layout()
 
-        # Save the combined figure
+        df = self.summary_stats["sleep_df"]
+        # Parse timestamps while ignoring the timezone offsets
+        df = df.dropna(subset=["MET Timestamp"])
+
+        # Ensure valid timestamps
+        def safe_parse_timestamp(x):
+            try:
+                return (
+                    datetime.strptime(x[:19], "%Y-%m-%dT%H:%M:%S")
+                    if pd.notna(x) and x
+                    else None
+                )
+            except ValueError:
+                return None
+
+        df["datetime"] = df["MET Timestamp"].apply(safe_parse_timestamp)
+        df = df.dropna(subset=["datetime"])
+        df["day"] = df["datetime"].dt.date
+
+        ax = fig.add_subplot(gs[1, 0])
+        unique_days = sorted(df["day"].unique())
+
+        y_scale = 15
+
+        y_ticks = []
+        y_labels = []
+
+        # Loop over each day
+        for i, day in enumerate(unique_days):
+            # If each day is guaranteed to appear exactly once in the df, just pick that row:
+            row = df.loc[df["day"] == day].iloc[0]
+
+            # day_offset is the hour/minute at which the first MET item starts
+            start_ts = row["datetime"]
+            offset_h = start_ts.hour + start_ts.minute / 60.0 + start_ts.second / 3600.0
+            day_met = np.array(row["MET Items"], dtype=float)
+
+            # For each MET item, figure out which minute it belongs to (0..N-1),
+            # convert to hours by dividing by 60, then add offset_h
+            hour_met = np.arange(len(day_met)) / 60.0 + offset_h
+
+            # Convert Activity Classification (5-min intervals) to an array
+            activity_class = np.array(list(row["Activity Classification"]), dtype=int)
+
+            # Expand each classification value over 5 consecutive minutes
+            expanded_activity_class = np.repeat(activity_class, 5)
+
+            # Ensure the length matches `day_met`
+            expected_length = len(day_met)
+            if len(expanded_activity_class) < expected_length:
+                expanded_activity_class = np.pad(
+                    expanded_activity_class,
+                    (0, expected_length - len(expanded_activity_class)),
+                    constant_values=0,
+                )
+            elif len(expanded_activity_class) > expected_length:
+                # Trim if somehow longer
+                expanded_activity_class = expanded_activity_class[:expected_length]
+
+            # Identify non-wear periods (where classification is 0)
+            non_wear_mask = expanded_activity_class == 0
+
+            # The y-value: i * y_scale is the vertical offset for day i
+            # So we do (i*y_scale + day_met).
+            # Plot MET data
+            ax.plot(
+                hour_met,
+                i * y_scale + day_met,
+                color="mediumblue",
+                alpha=0.67,
+                label="Oura MET Score" if i == 0 else "",
+            )
+
+            # Overlay non-wear regions
+            ax.scatter(
+                hour_met[non_wear_mask],
+                (i * y_scale + day_met)[non_wear_mask],
+                color="gray",
+                alpha=0.5,
+                label="Non-Wear" if i == 0 else "",
+            )
+
+            # Keep track of where to place the day label on the y-axis
+            y_ticks.append(i * y_scale)
+            y_labels.append(day)
+
+        ax.set_xlim([4, 28])
+
+        hours = list(range(4, 29))
+        labels = []
+        for h in hours:
+            hour = h if h < 24 else h - 24
+            labels.append(f"{hour}:00")
+
+        ax.set_xticks(hours)
+        ax.set_xticklabels(labels, rotation=45)
+        # Put each day on its own tick
+        ax.set_yticks(y_ticks)
+        ax.set_yticklabels(y_labels)
+        ax.set_title("MET Scores per Day")
+        ax.legend(
+            title="MET Scores per Day",
+            loc="upper left",
+            bbox_to_anchor=(1, 1),
+        )
+
+        plt.tight_layout()
+
         plt.savefig(
             os.path.join(
                 out_dir,
