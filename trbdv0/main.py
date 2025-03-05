@@ -22,6 +22,7 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 import pandas as pd
 from trbdv0.send_email import EmailSender
+from trbdv0.survey_automation import send_survey
 import argparse
 
 
@@ -183,6 +184,9 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
         )
     ):
         warnings.append(("Sleep Variation", "sleep_variation"))
+        patient = patient_stats.get("patient")
+        if patient == "DBSOCD001":
+            send_survey(patient, survey="ISS")
 
     # Steps variation warning
     if (
