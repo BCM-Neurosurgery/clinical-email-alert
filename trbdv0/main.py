@@ -22,6 +22,7 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 import pandas as pd
 from trbdv0.send_email import EmailSender
+from trbdv0.survey_automation import send_survey
 import argparse
 
 
@@ -183,6 +184,9 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
         )
     ):
         warnings.append(("Sleep Variation", "sleep_variation"))
+        patient = patient_stats.get("patient")
+        if patient == "DBSOCD001":
+            send_survey(patient, survey="ISS")
 
     # Steps variation warning
     if (
@@ -344,10 +348,15 @@ def main(config_file):
 
     for patient in config["active_patients"]:
         # locate patient folder
-        patient_in_dir = os.path.join(input_dir, patient)
+        patient_in_dir = None
+        for input_dir in config["input_dir"]:
+            potential_dir = os.path.join(input_dir, patient, "oura")
+            if os.path.exists(potential_dir):
+                patient_in_dir = potential_dir
+                break
 
         # check if patient folder exists
-        if not os.path.exists(patient_in_dir):
+        if patient_in_dir is None:
             logger.error(f"Patient folder {patient_in_dir} does not exist.")
             continue
 
