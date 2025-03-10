@@ -136,7 +136,10 @@ def calculate_average_met(activity_data: dict) -> float:
                    or None if no valid MET values exist.
     """
     class_5_min = np.array([int(c) for c in activity_data["class_5_min"]])
-    met_items = np.array(activity_data["met"]["items"])
+    met_items = np.array(
+        [float(m) if m is not None else np.nan for m in activity_data["met"]["items"]],
+        dtype=float,
+    )
 
     interval_seconds = int(activity_data["met"]["interval"])
     samples_per_class = 300 // interval_seconds
@@ -151,4 +154,4 @@ def calculate_average_met(activity_data: dict) -> float:
 
     valid_met_items = met_items[expanded_class != 0]
 
-    return np.mean(valid_met_items) if valid_met_items.size > 0 else None
+    return np.nanmean(valid_met_items) if valid_met_items.size > 0 else None

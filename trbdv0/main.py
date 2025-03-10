@@ -185,7 +185,7 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
     ):
         warnings.append(("Sleep Variation", "sleep_variation"))
         patient = patient_stats.get("patient")
-        if patient == "DBSOCD001":
+        if patient in ["DBSOCD001", "DBSOCD002"]:
             send_survey(patient, survey="ISS")
 
     # Steps variation warning
