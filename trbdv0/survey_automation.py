@@ -104,6 +104,3 @@ def send_survey(patient_id, survey="ISS"):
 
     # Print the response
     print("SMS response: ", response.json())
-
-
-send_survey("ThomasTest")  # only input patient string to send survey, e.g. "DBSOCD001"
