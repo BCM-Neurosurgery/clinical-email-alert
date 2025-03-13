@@ -184,9 +184,6 @@ def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
         )
     ):
         warnings.append(("Sleep Variation", "sleep_variation"))
-        patient = patient_stats.get("patient")
-        if patient in ["DBSOCD001", "DBSOCD002"]:
-            send_survey(patient, survey="ISS")
 
     # Steps variation warning
     if (
@@ -258,6 +255,11 @@ def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> s
     for patient_stats in all_patients_stats:
         warnings = get_patient_warnings(patient_stats, yesterday_date)
         warning_types = [w[1] for w in warnings]
+
+        if "sleep_variation" in warning_types:
+            patient = patient_stats.get("patient")
+            if patient in ["DBSOCD001", "DBSOCD002"]:
+                send_survey(patient, survey="ISS")
 
         missing_dates = missing_dates_dict.get(patient_stats["patient"], [])
         missing_count = len(missing_dates)
