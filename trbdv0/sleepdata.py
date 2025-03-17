@@ -437,8 +437,11 @@ class SleepData:
 
         df["datetime"] = df["MET Timestamp"].apply(safe_parse_timestamp)
         df = df.dropna(subset=["datetime"])
-        df["day"] = df["datetime"].dt.date
 
+        if df.empty:
+            return
+
+        df["day"] = df["datetime"].dt.date
         ax = fig.add_subplot(gs[1, 0])
         unique_days = sorted(df["day"].unique())
 
