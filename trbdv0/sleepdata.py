@@ -19,12 +19,16 @@ import pytz
 
 
 class SleepData:
-    def __init__(self, patient, config, logger) -> None:
+    def __init__(
+        self, patient, config, patient_in_dir, patient_out_dir, logger
+    ) -> None:
         """Init class
 
         Args:
             patient (str): e.g. Percept010, DBSOCD001
             config (dict): config dict
+            patient_in_dir (str): input oura folder which contains date folders
+            patient_out_dir (str): output folder for this patient
             data (list): list of dicts of sleep info
         """
         self.patient = patient
@@ -38,11 +42,9 @@ class SleepData:
         self.end_date = self.past_dates[0]
         # this contains a series of date folders
         # e.g. "2023-07-05", "2023-07-06", ...
-        self.patient_in_dir = os.path.join(config["input_dir"], patient, "oura")
+        self.patient_in_dir = patient_in_dir
         # e.g. /home/auto/CODE/PerceptOCD/oura-null-pipeline/oura_out/DBSOCD002/2025-04-09
-        self.patient_out_dir = os.path.join(
-            config["output_dir"], patient, self.today_date
-        )
+        self.patient_out_dir = patient_out_dir
         self.logger = logger
         # ingest sleep.json data into dataframe
         self.ingest()
@@ -143,7 +145,7 @@ class SleepData:
 
         return df[["bedtime_start", "bedtime_end"]]
 
-    def split_overnight_sleep(df: pd.DataFrame) -> pd.DataFrame:
+    def split_overnight_sleep(self, df: pd.DataFrame) -> pd.DataFrame:
         """Splits overnight sleep periods into two rows: before and after midnight.
 
         For each sleep period, if the sleep crosses midnight, it is split into two rows:
