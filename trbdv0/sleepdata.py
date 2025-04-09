@@ -11,56 +11,137 @@ from utils import (
     get_yesterdays_date,
     PHASE_MAPPING,
     calculate_average_met,
+    get_past_dates,
+    read_json,
 )
 from datetime import datetime
-
-# TODO: how to define a day?
+import pytz
 
 
 class SleepData:
-    def __init__(self, patient, data: list) -> None:
+    def __init__(self, patient, config, logger) -> None:
         """Init class
 
         Args:
-            patient (str): e.g. Percept010
+            patient (str): e.g. Percept010, DBSOCD001
+            config (dict): config dict
             data (list): list of dicts of sleep info
         """
-        # self.data looks like [{}, {}, ..., {}]
-        self.data = data
-        # self.sleep_data_one_day -> SleepDataOneDay object
-        self.sleep_data_one_day = {}
-        self.num_past_days = len(self.get_available_dates())
         self.patient = patient
-        self.summary_stats = self.get_summary_stats()
+        self.config = config
+        self.num_past_days = config["past_days"]
+        self.today_date = get_todays_date()
+        self.past_dates = get_past_dates(self.today_date, self.num_past_days)
+        # start date of the range, earliest
+        self.start_date = self.past_dates[-1]
+        # end date of the range, latest
+        self.end_date = self.past_dates[0]
+        # this contains a series of date folders
+        # e.g. "2023-07-05", "2023-07-06", ...
+        self.patient_in_dir = os.path.join(config["input_dir"], patient, "oura")
+        # e.g. /home/auto/CODE/PerceptOCD/oura-null-pipeline/oura_out/DBSOCD002/2025-04-09
+        self.patient_out_dir = os.path.join(
+            config["output_dir"], patient, self.today_date
+        )
+        self.logger = logger
+        # ingest sleep.json data into dataframe
+        self.ingest()
+        # get only bedtimes
+        self.bedtimes_df = self.get_bedtimes_df()
+        # transform the bedtimes and break it down to chunks
+        self.splitted_bedtimes_df = self.transform_bedtimes_df(self.bedtimes_df)
 
-    def get_num_past_days(self):
-        return self.num_past_days
+    def ingest(self):
+        """Ingests sleep data for a range of past dates.
 
-    def get_available_dates(self) -> set:
-        """Return all recorded dates
+        For each date in `self.past_dates`, this function attempts to read a corresponding
+        `sleep.json` file from `self.patient_in_dir`. If the file does not exist, the date is skipped.
+        If the file exists but has missing fields, those fields are filled with default values (e.g., NaN).
+
+        Populates:
+            self.sleep_data (list of dict): Each dict contains:
+                - sleep_phase_5_min (str or NaN)
+                - bedtime_start (datetime string or NaN)
+                - bedtime_end (datetime string or NaN)
+                - total_sleep_duration (float or NaN)
+
+            self.bedtimes (list of dict): Each dict contains:
+                - bedtime_start (datetime string or NaN)
+                - bedtime_end (datetime string or NaN)
+        """
+        self.sleep_data = []
+        self.bedtimes = []
+
+        for date in self.past_dates:
+            patient_date_json = os.path.join(self.patient_in_dir, date, "sleep.json")
+
+            if not os.path.exists(patient_date_json):
+                self.logger.error(f"{date} sleep data not found.")
+                continue
+
+            try:
+                sleep_data = read_json(patient_date_json)
+            except Exception as e:
+                self.logger.error(f"Failed to read JSON for {date}: {e}")
+                continue
+
+            for sleep_entry in sleep_data:
+                entry = {
+                    "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", np.nan),
+                    "bedtime_start": sleep_entry.get("bedtime_start", np.nan),
+                    "bedtime_end": sleep_entry.get("bedtime_end", np.nan),
+                    "total_sleep_duration": sleep_entry.get(
+                        "total_sleep_duration", np.nan
+                    ),
+                }
+                self.sleep_data.append(entry)
+
+                # Collect bedtime-only entries
+                self.bedtimes.append(
+                    {
+                        "bedtime_start": entry["bedtime_start"],
+                        "bedtime_end": entry["bedtime_end"],
+                    }
+                )
+
+    def get_bedtimes_df(self) -> pd.DataFrame:
+        """Transforms sleep schedule data into a DataFrame indexed by sleep end date.
+
+        Converts `bedtime_start` and `bedtime_end` strings to timezone-aware datetime objects
+        in America/Chicago time, and constructs a DataFrame indexed by the date part of
+        `bedtime_end` (i.e., the wake-up day).
+
+        Handles missing or malformed datetime fields by setting them to NaT (Not a Time).
 
         Returns:
-            set: set("2023-07-15", "2023-07-16")
+            pd.DataFrame: A DataFrame indexed by date (based on bedtime_end),
+                        with columns:
+                            - bedtime_start (datetime in Chicago timezone or NaT)
+                            - bedtime_end (datetime in Chicago timezone or NaT)
         """
-        res = set()
-        for sleep_chunk in self.data:
-            res.add(sleep_chunk["day"])
-        return res
+        if not self.sleep_data:
+            return pd.DataFrame()
 
-    def get_sleep_data_on_date(self, date: str) -> list:
-        """Return a list of sleep data on that day
+        df = pd.DataFrame(self.bedtimes)
 
-        Args:
-            day (str): "2023-09-14"
+        df["bedtime_start"] = pd.to_datetime(
+            df["bedtime_start"], errors="coerce", utc=True
+        )
+        df["bedtime_end"] = pd.to_datetime(df["bedtime_end"], errors="coerce", utc=True)
 
-        Returns:
-            list: [{}, {}, ...]
-        """
-        res = []
-        for sleep_chunk in self.data:
-            if sleep_chunk["day"] == date:
-                res.append(sleep_chunk)
-        return res
+        # Convert to Chicago timezone
+        chicago_tz = pytz.timezone("America/Chicago")
+        df["bedtime_start"] = df["bedtime_start"].dt.tz_convert(chicago_tz)
+        df["bedtime_end"] = df["bedtime_end"].dt.tz_convert(chicago_tz)
+
+        # Create 'day' column from bedtime_end (for indexing), keep NaT if bedtime_end is missing
+        df["day"] = df["bedtime_end"].dt.date
+
+        # Drop rows only if BOTH start and end are missing
+        df = df.dropna(subset=["bedtime_start", "bedtime_end"], how="all")
+        df.set_index("day", inplace=True)
+
+        return df[["bedtime_start", "bedtime_end"]]
 
     def get_summary_stats(self) -> dict:
         """Get summary stats of sleep data"""
