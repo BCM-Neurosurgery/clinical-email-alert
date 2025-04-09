@@ -135,7 +135,7 @@ class SleepData:
         df["bedtime_end"] = df["bedtime_end"].dt.tz_convert(chicago_tz)
 
         # Create 'day' column from bedtime_end (for indexing), keep NaT if bedtime_end is missing
-        df["day"] = df["bedtime_end"].dt.date
+        df["day"] = df["bedtime_start"].dt.date
 
         # Drop rows only if BOTH start and end are missing
         df = df.dropna(subset=["bedtime_start", "bedtime_end"], how="all")
