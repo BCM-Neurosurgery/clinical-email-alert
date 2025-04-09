@@ -49,7 +49,7 @@ class SleepData:
         # get only bedtimes
         self.bedtimes_df = self.get_bedtimes_df()
         # transform the bedtimes and break it down to chunks
-        self.splitted_bedtimes_df = self.transform_bedtimes_df(self.bedtimes_df)
+        self.splitted_bedtimes_df = self.split_overnight_sleep(self.bedtimes_df)
 
     def ingest(self):
         """Ingests sleep data for a range of past dates.
@@ -142,6 +142,51 @@ class SleepData:
         df.set_index("day", inplace=True)
 
         return df[["bedtime_start", "bedtime_end"]]
+
+    def split_overnight_sleep(df: pd.DataFrame) -> pd.DataFrame:
+        """Splits overnight sleep periods into two rows: before and after midnight.
+
+        For each sleep period, if the sleep crosses midnight, it is split into two rows:
+        one from `bedtime_start` to midnight, and one from midnight to `bedtime_end`.
+
+        Args:
+            df (pd.DataFrame): DataFrame indexed by day with columns:
+                            - bedtime_start (datetime)
+                            - bedtime_end (datetime)
+
+        Returns:
+            pd.DataFrame: A transformed DataFrame with possibly more rows,
+                        each representing part of a sleep segment that
+                        does not cross midnight.
+        """
+        if df.empty:
+            return df.copy()
+
+        split_rows = []
+        for day, row in df.iterrows():
+            start = row["bedtime_start"]
+            end = row["bedtime_end"]
+
+            if pd.isna(start) or pd.isna(end):
+                continue
+
+            if start.date() == end.date():
+                split_rows.append({"bedtime_start": start, "bedtime_end": end})
+            else:
+                # Sleep crosses midnight, split into two
+                midnight = start.replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ) + pd.Timedelta(days=1)
+                split_rows.append({"bedtime_start": start, "bedtime_end": midnight})
+                split_rows.append({"bedtime_start": midnight, "bedtime_end": end})
+
+        result_df = pd.DataFrame(split_rows)
+
+        # Create index again from bedtime_end's date
+        result_df["day"] = result_df["bedtime_start"].dt.date
+        result_df.set_index("day", inplace=True)
+
+        return result_df[["bedtime_start", "bedtime_end"]]
 
     def get_summary_stats(self) -> dict:
         """Get summary stats of sleep data"""
