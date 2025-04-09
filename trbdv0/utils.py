@@ -59,17 +59,20 @@ def get_yesterdays_date() -> str:
 
 
 def get_past_dates(end_date: str, past_days: int = 7) -> list:
-    """Get week dates on and before end_date
+    """Get a sorted list of past dates before the given end_date.
 
     Args:
-        end_date (str): e.g. "2023-07-05"
+        end_date (str): The end date in "YYYY-MM-DD" format (excluded from result).
+        past_days (int): Number of past days to retrieve before the end_date. Default is 7.
 
     Returns:
-        list: a list of dates going back for a week on and before end_date
+        list: A list of dates (as strings) in "YYYY-MM-DD" format,
+              sorted from the earliest to latest, excluding the end_date itself.
     """
     end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
     date_list = [end_date_dt - timedelta(days=x) for x in range(1, past_days + 1)]
-    return [date.strftime("%Y-%m-%d") for date in date_list]
+    sorted_dates = sorted(date_list)
+    return [date.strftime("%Y-%m-%d") for date in sorted_dates]
 
 
 def read_json(json_path: str) -> list:
