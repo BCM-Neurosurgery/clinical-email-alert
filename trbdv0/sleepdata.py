@@ -52,6 +52,12 @@ class SleepData:
         self.bedtimes_df = self.get_bedtimes_df()
         # transform the bedtimes and break it down to chunks
         self.splitted_bedtimes_df = self.split_overnight_sleep(self.bedtimes_df)
+        # add missing dates with empty rows
+        self.filled_splitted_bedtimes_df = self.fill_missing_dates(
+            self.splitted_bedtimes_df
+        )
+        self.plot_bedtime_schedule(self.filled_splitted_bedtimes_df)
+        print()
 
     def ingest(self):
         """Ingests sleep data for a range of past dates.
@@ -189,6 +195,93 @@ class SleepData:
         result_df.set_index("day", inplace=True)
 
         return result_df[["bedtime_start", "bedtime_end"]]
+
+    def fill_missing_dates(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Fills missing dates in the sleep dataframe with NaT rows.
+
+        Args:
+            df (pd.DataFrame): Original sleep DataFrame with datetime.date index.
+
+        Returns:
+            pd.DataFrame: DataFrame with all expected dates included,
+                        and NaT rows inserted for missing days.
+        """
+        full_range = [pd.to_datetime(d).date() for d in self.past_dates]
+
+        existing_days = set(df.index)
+        missing_days = set(full_range) - existing_days
+
+        empty_rows = pd.DataFrame(
+            {
+                "bedtime_start": pd.NaT,
+                "bedtime_end": pd.NaT,
+            },
+            index=sorted(missing_days),
+        )
+
+        # Combine and sort
+        df_filled = pd.concat([df, empty_rows], axis=0).sort_index()
+
+        return df_filled
+
+    def plot_bedtime_schedule(self, df: pd.DataFrame, title="Sleep Schedule", ax=None):
+        """Plots sleep segments for each date as horizontal bars.
+
+        Args:
+            df (pd.DataFrame): DataFrame with columns `bedtime_start` and `bedtime_end`,
+                            and date as index (after split into sleep segments).
+            title (str): Title of the plot.
+            ax (matplotlib.axes.Axes, optional): An existing axis to plot into.
+                                                If None, a new figure and axis are created.
+
+        Returns:
+            tuple: (fig, ax) where:
+                - fig (matplotlib.figure.Figure): The figure object.
+                - ax (matplotlib.axes.Axes): The axis containing the sleep schedule plot.
+        """
+        if df.empty:
+            print("No sleep data to plot.")
+            return None, None
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(12, max(5, len(df.index.unique()) * 0.4)))
+        else:
+            fig = ax.figure
+
+        for i, (day, row) in enumerate(df.iterrows()):
+            start = row["bedtime_start"]
+            end = row["bedtime_end"]
+
+            if pd.isna(start) or pd.isna(end):
+                continue
+
+            start_hour = start.hour + start.minute / 60
+            end_hour = end.hour + end.minute / 60
+
+            if end_hour < start_hour:
+                end_hour += 24
+
+            ax.barh(
+                y=day,
+                width=end_hour - start_hour,
+                left=start_hour,
+                height=0.6,
+                color="skyblue",
+                edgecolor="black",
+            )
+
+        ax.set_xlim(0, 24)
+        ax.set_xlabel("Hour of Day")
+        ax.set_ylabel("Date")
+        ax.set_title(title)
+        ax.set_xticks(range(0, 25, 2))
+        ax.set_yticks(sorted(df.index.unique()))
+        ax.set_yticklabels([str(d) for d in sorted(df.index.unique())])
+        ax.grid(True, axis="x", linestyle="--", alpha=0.5)
+
+        fig.savefig("debug_sleep_plot.png")
+
+        return fig, ax
 
     def get_summary_stats(self) -> dict:
         """Get summary stats of sleep data"""
