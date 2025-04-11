@@ -18,7 +18,7 @@ from datetime import datetime
 import pytz
 
 
-class SleepData:
+class Sleep:
     def __init__(
         self, patient, config, patient_in_dir, patient_out_dir, logger
     ) -> None:
@@ -67,6 +67,15 @@ class SleepData:
 
     def get_past_dates(self):
         return self.past_dates
+
+    def get_patient(self):
+        return self.patient
+
+    def get_bedtimes(self):
+        return self.bedtimes
+
+    def get_sleep_data(self):
+        return self.sleep_data
 
     def ingest(self):
         """Ingests sleep data for a range of past dates.
