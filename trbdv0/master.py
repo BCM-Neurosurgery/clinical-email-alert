@@ -5,8 +5,9 @@ import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import matplotlib.colors as mcolors
-import matplotlib.cm as cm
+from utils import get_yesterdays_date
+from datetime import datetime
+import numpy as np
 
 
 class Master:
@@ -313,23 +314,6 @@ class Master:
             "unidentified": "#ffe17b",  # soft yellow for unknown in-bed state
         }
 
-        def assign_state(row):
-            if (
-                row.get("activity_class") == 0
-                or pd.isna(row.get("met"))
-                or row.get("met") <= 0.1
-            ):
-                return "not_worn/battery_dead"
-            if row.get("sleep_phase_label") == "deep":
-                return "deep_sleep"
-            if row.get("sleep_phase_label") == "light":
-                return "light_sleep"
-            if row.get("sleep_phase_label") == "REM":
-                return "REM_sleep"
-            if row.get("sleep_phase_label") == "awake":
-                return "awake"
-            return "unidentified"
-
         df = self.master_integrated_time
         if df.empty:
             print("No data to plot.")
@@ -349,7 +333,7 @@ class Master:
             if day_df.empty:
                 continue
 
-            day_df["state"] = day_df.apply(assign_state, axis=1)
+            day_df["state"] = day_df.apply(self.assign_state, axis=1)
 
             # Step 3: Plot each state as a block
             for state, state_df in day_df.groupby("state"):
@@ -401,6 +385,23 @@ class Master:
         fig.savefig("debug_sleep_activity_plot.png", dpi=150)
 
         return fig, ax
+
+    def assign_state(self, row):
+        if (
+            row.get("activity_class") == 0
+            or pd.isna(row.get("met"))
+            or row.get("met") <= 0.1
+        ):
+            return "not_worn/battery_dead"
+        if row.get("sleep_phase_label") == "deep":
+            return "deep_sleep"
+        if row.get("sleep_phase_label") == "light":
+            return "light_sleep"
+        if row.get("sleep_phase_label") == "REM":
+            return "REM_sleep"
+        if row.get("sleep_phase_label") == "awake":
+            return "awake"
+        return "unidentified"
 
     def get_segments(self, df: pd.DataFrame) -> list:
         """Returns (start_hour, end_hour) segments where rows are contiguous by 1-minute timestamps."""
@@ -523,3 +524,171 @@ class Master:
         fig.tight_layout()
         fig.savefig(f"debug_met_bucket_gantt_{self.patient}.png", dpi=150)
         return fig, ax
+
+    def compute_average_sleep_hours(self, df) -> pd.DataFrame:
+        """
+        Computes average daily sleep duration from master_integrated_time.
+
+        Automatically assigns 'state' based on sleep_phase_label and activity/met status.
+
+        Args:
+            df (pd.DataFrame): master_integrated_time with sleep_phase_label, met, activity_class, and day
+
+        Returns:
+            float: Average sleep duration in hours per day.
+        """
+        if df.empty or "day" not in df.columns:
+            raise ValueError("Input DataFrame must include 'day' column.")
+
+        df = df.copy()
+        df["state"] = df.apply(self.assign_state, axis=1)
+
+        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+        sleep_df = df[df["state"].isin(sleep_states)]
+
+        daily_sleep = (
+            sleep_df.groupby("day").size().rename("sleep_minutes").reset_index()
+        )
+
+        daily_sleep["sleep_hours"] = daily_sleep["sleep_minutes"] / 60.0
+        avg_sleep_hours = daily_sleep["sleep_hours"].mean()
+
+        return avg_sleep_hours
+
+    def compute_yesterday_sleep_hours(self) -> float:
+        """
+        Computes total sleep duration (in hours) for 'yesterday' in self.timezone.
+
+        Sleep includes deep, light, and REM phases. Excludes non-wear, awake, unidentified.
+
+        Returns:
+            float: Total sleep hours for yesterday.
+        """
+        df = self.master_integrated_time
+        if df.empty or "day" not in df.columns:
+            raise ValueError("Input DataFrame must include 'day' column.")
+
+        yesterday = datetime.strptime(
+            get_yesterdays_date(self.timezone), "%Y-%m-%d"
+        ).date()
+
+        df = df.copy()
+        df["state"] = df.apply(self.assign_state, axis=1)
+
+        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+        sleep_df = df[(df["day"] == yesterday) & (df["state"].isin(sleep_states))]
+
+        sleep_minutes = len(sleep_df)
+        sleep_hours = sleep_minutes / 60.0
+
+        return sleep_hours
+
+    def compute_average_steps(self) -> int:
+        """
+        Computes the average daily step count from self.activity.steps.
+
+        Returns:
+            int: Average steps per day (rounded to nearest integer), or np.nan if no data.
+        """
+        if not self.activity.steps:
+            return np.nan
+
+        df = pd.DataFrame(self.activity.steps)
+
+        # Validate 'steps' and 'timestamp' keys exist
+        if "steps" not in df.columns or "timestamp" not in df.columns:
+            return np.nan
+
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["day"] = df["timestamp"].dt.date
+
+        # Group by day and sum steps per day
+        daily_steps = df.groupby("day")["steps"].sum()
+        avg_steps = daily_steps.mean()
+
+        return int(round(avg_steps))
+
+    def compute_yesterdays_steps(self) -> int:
+        """
+        Returns the total step count for yesterday based on self.timezone.
+
+        Returns:
+            int: Total number of steps yesterday, or np.nan if no data.
+        """
+        if not self.activity.steps:
+            return np.nan
+
+        yesterday = datetime.strptime(
+            get_yesterdays_date(self.timezone), "%Y-%m-%d"
+        ).date()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(self.activity.steps)
+
+        if "steps" not in df.columns or "timestamp" not in df.columns:
+            return np.nan
+
+        # Parse timestamps and extract day
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["day"] = df["timestamp"].dt.date
+
+        # Filter for yesterday's entries
+        df_yesterday = df[df["day"] == yesterday]
+
+        if df_yesterday.empty:
+            return np.nan
+
+        # Sum steps for yesterday
+        return int(df_yesterday["steps"].sum())
+
+    def compute_average_met(self) -> float:
+        """
+        Computes the average MET from self.master_integrated_time, ignoring NaN values.
+
+        Returns:
+            float: Average MET (rounded to 2 decimals), or np.nan if no valid data.
+        """
+        df = self.master_integrated_time
+
+        if df.empty or "met" not in df.columns:
+            return np.nan
+
+        valid_met = df["met"].dropna()
+
+        if valid_met.empty:
+            return np.nan
+
+        return valid_met.mean()
+
+    def compute_yesterdays_met(self) -> float:
+        """
+        Computes the average MET for yesterday based on self.timezone.
+
+        Ignores NaN MET values. Includes all other MET values, even ≤ 0.1.
+
+        Returns:
+            float: Average MET for yesterday (rounded to 2 decimals), or np.nan if no data.
+        """
+        df = self.master_integrated_time
+
+        if df.empty or "day" not in df.columns or "met" not in df.columns:
+            return np.nan
+
+        yesterday = datetime.strptime(
+            get_yesterdays_date(self.timezone), "%Y-%m-%d"
+        ).date()
+
+        df = df.copy()
+        df["day"] = pd.to_datetime(df["day"]).dt.date
+
+        df_yesterday = df[df["day"] == yesterday]
+
+        if df_yesterday.empty:
+            return np.nan
+
+        valid_met = df_yesterday["met"].dropna()
+
+        if valid_met.empty:
+            return np.nan
+
+        return valid_met.mean()
