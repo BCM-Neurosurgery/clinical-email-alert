@@ -5,6 +5,8 @@ import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
 
 
 class Master:
@@ -19,7 +21,8 @@ class Master:
         self.patient = self.sleep.get_patient()
         self.timegrid = self.build_time_grid()
         self.master_integrated_time = self.build_master_integrated_time()
-        self.plot_integrated_sleep_activity_schedule()
+        self.plot_met_buckets_gantt()
+        # self.plot_integrated_sleep_activity_schedule()
 
     def build_time_grid(self) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
@@ -368,7 +371,6 @@ class Master:
         ax.set_xlim(0, 24)
         ax.set_xticks(range(0, 25, 2))
         ax.set_xlabel(f"Hour of Day ({self.timezone})")
-        ax.set_ylabel("Date")
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
         ax.set_title(f"{title} — Patient {self.patient}")
@@ -420,3 +422,102 @@ class Master:
             segments.append((current_start, previous_hour + 1 / 60))
 
         return segments
+
+    def plot_met_buckets_gantt(self, title="MET Binned Gantt Chart"):
+        """
+        Plots MET Gantt chart using 7 discrete color buckets. One row per day.
+        """
+        df = self.master_integrated_time
+        if df.empty or "met" not in df.columns:
+            print("No MET data to plot.")
+            return
+
+        df = df.copy()
+        df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0
+        df = df.sort_values(["day", "hour"])
+
+        # Define color buckets
+        # Step 1: Define value-based bucket labels
+        def bucketize_met(val):
+            if pd.isna(val) or val <= 0.1:
+                return "non_wear/battery_dead"
+            elif val < 0.5:
+                return "0.1 - 0.5"
+            elif val < 1.0:
+                return "0.5 - 1.0"
+            elif val < 2.0:
+                return "1.0 - 2.0"
+            elif val < 3.0:
+                return "2.0 - 3.0"
+            elif val < 4.5:
+                return "3.0 - 4.5"
+            else:
+                return "> 4.5"
+
+        df["met_bucket"] = df["met"].apply(bucketize_met)
+
+        # Color map
+        bucket_colors = {
+            "non_wear/battery_dead": "#aaaaaa",  # gray, non-wear
+            "0.1 - 0.5": "#deebf7",  # very light blue
+            "0.5 - 1.0": "#9ecae1",  # light blue
+            "1.0 - 2.0": "#6baed6",  # medium blue
+            "2.0 - 3.0": "#4292c6",  # standard blue
+            "3.0 - 4.5": "#2171b5",  # deep blue
+            "> 4.5": "#084594",  # darkest blue
+        }
+
+        days = sorted(df["day"].unique())
+        day_to_y = {day: i for i, day in enumerate(days)}
+
+        fig, ax = plt.subplots(figsize=(14, max(6, len(days) * 0.4)))
+
+        for day in days:
+            day_df = df[df["day"] == day]
+            for bucket, bucket_df in day_df.groupby("met_bucket"):
+                segments = self.get_segments(bucket_df)
+                for start, end in segments:
+                    ax.barh(
+                        y=day_to_y[day],
+                        left=start,
+                        width=end - start,
+                        height=0.6,
+                        color=bucket_colors[bucket],
+                        hatch="///",
+                        edgecolor=(
+                            "#888888" if bucket == "non_wear/battery_dead" else "none"
+                        ),
+                        linewidth=0.2,
+                        zorder=2,
+                    )
+
+        # Formatting
+        ax.set_xlim(0, 24)
+        ax.set_xticks(range(0, 25, 2))
+        ax.set_xlabel(f"Hour of Day ({self.timezone})")
+        ax.set_yticks(range(len(days)))
+        ax.set_yticklabels([str(day) for day in days])
+        ax.set_title(f"{title} — Patient {self.patient}")
+        ax.grid(True, axis="x", linestyle="--", alpha=0.3)
+
+        # Legend
+        legend_handles = [
+            mpatches.Patch(
+                facecolor=color,
+                hatch="///" if bucket == "non_wear/battery_dead" else None,
+                edgecolor="#888888" if bucket == "non_wear/battery_dead" else "none",
+                label=bucket.replace("_", " ").capitalize(),
+            )
+            for bucket, color in bucket_colors.items()
+        ]
+        ax.legend(
+            handles=legend_handles,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1),  # move legend outside the right edge
+            borderaxespad=0.0,
+            frameon=True,
+        )
+
+        fig.tight_layout()
+        fig.savefig(f"debug_met_bucket_gantt_{self.patient}.png", dpi=150)
+        return fig, ax
