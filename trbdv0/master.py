@@ -277,7 +277,7 @@ class Master:
         df = df.merge(df_met[["timestamp", "met"]], on="timestamp", how="left")
 
         # 8. Fill default values
-        df["in_bed"] = df["in_bed"].fillna(False).astype("boolean")
+        df["in_bed"] = df["in_bed"].astype("boolean").fillna(False)
 
         # 9. Add day field
         df["day"] = df["timestamp"].dt.date
@@ -335,7 +335,7 @@ class Master:
         df = df.copy()
         # hour as float, since we are plotting on hours
         df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60
-        days = sorted(df["day"].unique(), reverse=True)
+        days = sorted(df["day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 
         fig, ax = plt.subplots(figsize=(14, max(6, len(days) * 0.4)))
@@ -367,11 +367,11 @@ class Master:
         # Final formatting
         ax.set_xlim(0, 24)
         ax.set_xticks(range(0, 25, 2))
-        ax.set_xlabel("Hour of Day")
+        ax.set_xlabel(f"Hour of Day ({self.timezone})")
         ax.set_ylabel("Date")
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
-        ax.set_title(title)
+        ax.set_title(f"{title} — Patient {self.patient}")
         ax.grid(True, axis="x", linestyle="--", alpha=0.5)
 
         # Legend
@@ -380,6 +380,8 @@ class Master:
                 facecolor=color,
                 label=state.replace("_", " ").capitalize(),
                 hatch="///" if state == "not_worn/battery_dead" else None,
+                edgecolor="black" if state == "awake" else None,
+                linewidth=0.5,
             )
             for state, color in state_colors.items()
         ]
