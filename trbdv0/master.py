@@ -21,8 +21,8 @@ class Master:
         self.patient = self.sleep.get_patient()
         self.timegrid = self.build_time_grid()
         self.master_integrated_time = self.build_master_integrated_time()
-        self.plot_met_buckets_gantt()
-        # self.plot_integrated_sleep_activity_schedule()
+        # self.plot_met_buckets_gantt()
+        self.plot_integrated_sleep_activity_schedule()
 
     def build_time_grid(self) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
@@ -309,7 +309,7 @@ class Master:
             "deep_sleep": "#0b3d91",  # dark blue
             "light_sleep": "#3c82e0",  # medium blue
             "REM_sleep": "#9ec5f2",  # light blue
-            "awake": "#ffffff",  # white
+            "awake": "#e6e6e6",  # light grey
             "unidentified": "#ffe17b",  # soft yellow for unknown in-bed state
         }
 
@@ -361,9 +361,11 @@ class Master:
                         left=start,
                         height=0.6,
                         color=state_colors.get(state),
-                        edgecolor="black",
+                        edgecolor=(
+                            "#888888" if state == "not_worn/battery_dead" else None
+                        ),
                         hatch="///" if state == "not_worn/battery_dead" else None,
-                        linewidth=0.5,
+                        linewidth=0.2,
                         zorder=2,
                     )
 
@@ -382,8 +384,8 @@ class Master:
                 facecolor=color,
                 label=state.replace("_", " ").capitalize(),
                 hatch="///" if state == "not_worn/battery_dead" else None,
-                edgecolor="black" if state == "awake" else None,
-                linewidth=0.5,
+                edgecolor="#888888" if state == "not_worn/battery_dead" else None,
+                linewidth=0.2,
             )
             for state, color in state_colors.items()
         ]
