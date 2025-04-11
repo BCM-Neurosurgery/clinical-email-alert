@@ -5,9 +5,10 @@ import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from utils import get_yesterdays_date
+from utils import get_yesterdays_date, get_todays_date
 from datetime import datetime
 import numpy as np
+import os
 
 
 class Master:
@@ -16,6 +17,10 @@ class Master:
         self.activity = activity
         self.timezone = timezone
         self.logger = self.sleep.logger
+        self.patient = self.sleep.get_patient()
+        self.plot_save_path = os.path.join(
+            self.sleep.patient_out_dir, f"{self.patient}.png"
+        )
         # e.g. 2025-04-01
         self.start_date = self.sleep.get_start_date()
         self.end_date = self.sleep.get_end_date()
@@ -295,7 +300,7 @@ class Master:
         return df
 
     def plot_integrated_sleep_activity_schedule(
-        self, title="Sleep & Activity Schedule"
+        self, title="Sleep & Activity Schedule", ax=None
     ):
         """Plots a Gantt chart with in-bed intervals as background, overlaid with sleep phase, activity class 0 (no-wear),
         and low MET segments.
@@ -325,7 +330,11 @@ class Master:
         days = sorted(df["day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 
-        fig, ax = plt.subplots(figsize=(14, max(6, len(days) * 0.4)))
+        height = max(6, len(days) * 0.4)
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(14, height))
+        else:
+            fig = ax.figure
 
         for day in days:
             day_df = df[(df["day"] == day) & (df["in_bed"] == True)].copy()
@@ -382,7 +391,6 @@ class Master:
         )
 
         fig.tight_layout()
-        fig.savefig("debug_sleep_activity_plot.png", dpi=150)
 
         return fig, ax
 
@@ -426,7 +434,7 @@ class Master:
 
         return segments
 
-    def plot_met_buckets_gantt(self, title="MET Binned Gantt Chart"):
+    def plot_met_buckets_gantt(self, title="MET Binned Gantt Chart", ax=None):
         """
         Plots MET Gantt chart using 7 discrete color buckets. One row per day.
         """
@@ -439,11 +447,13 @@ class Master:
         df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0
         df = df.sort_values(["day", "hour"])
 
+        non_worn_label = "non_worn/battery_dead"
+
         # Define color buckets
         # Step 1: Define value-based bucket labels
         def bucketize_met(val):
             if pd.isna(val) or val <= 0.1:
-                return "non_wear/battery_dead"
+                return non_worn_label
             elif val < 0.5:
                 return "0.1 - 0.5"
             elif val < 1.0:
@@ -461,7 +471,7 @@ class Master:
 
         # Color map
         bucket_colors = {
-            "non_wear/battery_dead": "#aaaaaa",  # gray, non-wear
+            non_worn_label: "#aaaaaa",  # gray, non-worn
             "0.1 - 0.5": "#deebf7",  # very light blue
             "0.5 - 1.0": "#9ecae1",  # light blue
             "1.0 - 2.0": "#6baed6",  # medium blue
@@ -473,7 +483,11 @@ class Master:
         days = sorted(df["day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 
-        fig, ax = plt.subplots(figsize=(14, max(6, len(days) * 0.4)))
+        height = max(6, len(days) * 0.4)
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(14, height))
+        else:
+            fig = ax.figure
 
         for day in days:
             day_df = df[df["day"] == day]
@@ -487,9 +501,7 @@ class Master:
                         height=0.6,
                         color=bucket_colors[bucket],
                         hatch="///",
-                        edgecolor=(
-                            "#888888" if bucket == "non_wear/battery_dead" else "none"
-                        ),
+                        edgecolor=("#888888" if bucket == non_worn_label else "none"),
                         linewidth=0.2,
                         zorder=2,
                     )
@@ -507,8 +519,8 @@ class Master:
         legend_handles = [
             mpatches.Patch(
                 facecolor=color,
-                hatch="///" if bucket == "non_wear/battery_dead" else None,
-                edgecolor="#888888" if bucket == "non_wear/battery_dead" else "none",
+                hatch="///" if bucket == non_worn_label else None,
+                edgecolor="#888888" if bucket == non_worn_label else "none",
                 label=bucket.replace("_", " ").capitalize(),
             )
             for bucket, color in bucket_colors.items()
@@ -522,21 +534,61 @@ class Master:
         )
 
         fig.tight_layout()
-        fig.savefig(f"debug_met_bucket_gantt_{self.patient}.png", dpi=150)
         return fig, ax
 
-    def compute_average_sleep_hours(self, df) -> pd.DataFrame:
+    def plot_combined_sleep_and_met(self, title="Sleep + MET Summary"):
+        """
+        Plots a combined figure of sleep/activity and MET Gantt charts stacked vertically,
+        sharing the same x-axis (Hour of Day).
+
+        Args:
+            title (str): Combined plot title
+
+        Returns:
+            (fig, (ax1, ax2)): The matplotlib figure and axes tuple
+        """
+        df = self.master_integrated_time
+
+        if df.empty or "day" not in df.columns:
+            raise ValueError("master_integrated_time must have a 'day' column.")
+
+        days = sorted(df["day"].unique())
+        height = max(6, len(days) * 0.4)
+
+        # Create a new figure with 2 rows and shared x-axis
+        fig, (ax1, ax2) = plt.subplots(
+            nrows=2,
+            figsize=(14, height * 2),
+            sharex=True,
+            gridspec_kw={"height_ratios": [1, 1]},
+        )
+
+        # Plot both charts into the provided axes
+        self.plot_integrated_sleep_activity_schedule(ax=ax1)
+        self.plot_met_buckets_gantt(ax=ax2)
+
+        # Set subplot titles if needed
+        ax1.set_title("Sleep & Activity Schedule")
+        ax2.set_title("MET Intensity")
+
+        # Set shared figure title
+        fig.suptitle(f"{title} — Patient {self.patient}", fontsize=16)
+        fig.tight_layout(rect=[0, 0, 1, 0.96])
+
+        fig.savefig(self.plot_save_path, dpi=150)
+
+        return fig, (ax1, ax2)
+
+    def compute_average_sleep_hours(self) -> pd.DataFrame:
         """
         Computes average daily sleep duration from master_integrated_time.
 
         Automatically assigns 'state' based on sleep_phase_label and activity/met status.
 
-        Args:
-            df (pd.DataFrame): master_integrated_time with sleep_phase_label, met, activity_class, and day
-
         Returns:
             float: Average sleep duration in hours per day.
         """
+        df = self.master_integrated_time
         if df.empty or "day" not in df.columns:
             raise ValueError("Input DataFrame must include 'day' column.")
 
@@ -692,3 +744,93 @@ class Master:
             return np.nan
 
         return valid_met.mean()
+
+    def get_missing_sleep_dates(self) -> list:
+        """Return a list of missing dates in the dates list
+
+        Returns:
+            list: ["2023-06-23", "2023-06-24"]
+        """
+        res = []
+        for date in self.sleep.get_past_dates():
+            patient_date_json = os.path.join(
+                self.sleep.patient_in_dir, date, "sleep.json"
+            )
+            if not os.path.exists(patient_date_json):
+                res.append(date)
+        return res
+
+    def get_summary_stats(self) -> dict:
+        """
+        Returns a dictionary of daily summary statistics including:
+            - average_sleep_hours
+            - yesterday_sleep_hours
+            - average_steps
+            - yesterday_steps
+            - average_met
+            - yesterday_met
+            - missing_sleep_dates
+
+        Returns:
+            dict: Summary stats with float or np.nan values
+        """
+        return {
+            "patient": self.patient,
+            "todays_date": get_todays_date(),
+            "yesterdays_date": get_yesterdays_date(),
+            "average_sleep_hours": self.compute_average_sleep_hours(),
+            "yesterday_sleep_hours": self.compute_yesterday_sleep_hours(),
+            "average_steps": self.compute_average_steps(),
+            "yesterday_steps": self.compute_yesterdays_steps(),
+            "average_met": self.compute_average_met(),
+            "yesterday_met": self.compute_yesterdays_met(),
+            "missing_sleep_dates": self.get_missing_sleep_dates(),
+            "number_of_noncompliance_days": len(self.get_missing_sleep_dates()),
+            "number_of_days": len(self.sleep.get_past_dates()),
+        }
+
+    def generate_warning_flags(self, summary: dict) -> dict:
+        """
+        Generate a simple dictionary of triggered warning flags from a patient's summary.
+
+        Args:
+            summary (dict): Output from get_summary_stats()
+
+        Returns:
+            dict: {
+                "missing_data": bool,
+                "sleep_variation": bool,
+                "steps_variation": bool,
+                "met_variation": bool
+            }
+        """
+        y_sleep = summary.get("yesterday_sleep_hours")
+        avg_sleep = summary.get("average_sleep_hours")
+        y_steps = summary.get("yesterday_steps")
+        avg_steps = summary.get("average_steps")
+        y_met = summary.get("yesterday_met")
+        avg_met = summary.get("average_met")
+        non_compliance_days = summary.get("number_of_noncompliance_days")
+
+        return {
+            "missing_data": any(pd.isna(v) for v in [y_sleep, y_steps, y_met]),
+            "has_noncompliance_days": non_compliance_days > 0,
+            "sleep_variation": (
+                not pd.isna(y_sleep)
+                and not pd.isna(avg_sleep)
+                and avg_sleep > 0
+                and (y_sleep < 0.75 * avg_sleep or y_sleep > 1.25 * avg_sleep)
+            ),
+            "steps_variation": (
+                not pd.isna(y_steps)
+                and not pd.isna(avg_steps)
+                and avg_steps > 0
+                and (y_steps < 0.75 * avg_steps or y_steps > 1.25 * avg_steps)
+            ),
+            "met_variation": (
+                not pd.isna(y_met)
+                and not pd.isna(avg_met)
+                and avg_met > 0
+                and (y_met < 0.75 * avg_met or y_met > 1.25 * avg_met)
+            ),
+        }

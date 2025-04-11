@@ -40,7 +40,7 @@ def format_seconds(seconds: int) -> str:
     return str(td)
 
 
-def get_todays_date(timezone: str) -> str:
+def get_todays_date(timezone="America/Chicago") -> str:
     """
     Get today's date in the specified timezone.
 
@@ -55,7 +55,7 @@ def get_todays_date(timezone: str) -> str:
     return now_local.strftime("%Y-%m-%d")
 
 
-def get_yesterdays_date(timezone: str) -> str:
+def get_yesterdays_date(timezone="America/Chicago") -> str:
     """
     Get the date of yesterday in the specified timezone.
 

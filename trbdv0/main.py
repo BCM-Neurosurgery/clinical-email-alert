@@ -6,7 +6,9 @@ Usage
 - python main.py
 """
 
-from sleepdata import SleepData
+from sleep import Sleep
+from activity import Activity
+from master import Master
 from utils import (
     get_todays_date,
     get_yesterdays_date,
@@ -24,6 +26,9 @@ import pandas as pd
 from trbdv0.send_email import EmailSender
 from trbdv0.survey_automation import send_survey
 import argparse
+import numpy as np
+import json
+from collections import defaultdict
 
 
 class CSTFormatter(logging.Formatter):
@@ -60,253 +65,93 @@ def setup_logger(name, file_path, level=logging.INFO):
     return logger
 
 
-def merge_sleep_data(dates: list, patient_dir: str, logger: logging.Logger) -> list:
-    """Merge sleep data based on dates, return a merged list with selected keys.
-    If sleep data is missing, fill in with empty values.
-
-    Args:
-        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
-        patient_dir (str): patient dir that contains all data,
-            e.g. "./oura/Percept004/"
-        logger (logging.Logger): logger
-
-    Returns:
-        list: [{}, {}, {}, ..., {}]
-    """
-    res = []
-    for date in dates:
-        sleep_data = []
-        activity_data = []
-
-        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
-        daily_activity_json = os.path.join(patient_dir, date, "daily_activity.json")
-
-        if not os.path.exists(patient_date_json):
-            logger.error(f"{date} sleep data not found.")
-            sleep_data = [{"day": date}]
-        else:
-            sleep_data = read_json(patient_date_json)
-
-        if not os.path.exists(daily_activity_json):
-            logger.error(f"{date} daily activity data not found.")
-            activity_data = []
-        else:
-            activity_data = read_json(daily_activity_json)
-
-        for sleep_entry in sleep_data:
-            entry = {
-                "day": date,
-                "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", ""),
-                "bedtime_start": sleep_entry.get("bedtime_start", None),
-                "bedtime_end": sleep_entry.get("bedtime_end", None),
-                "class_5_min": "",
-                "non_wear_time": 0,
-                "timestamp": "",
-                "steps": 0,
-                "met": {},
-            }
-
-            # Find corresponding activity entry with the same day
-            matching_activity = next(
-                (activity for activity in activity_data if activity.get("day") == date),
-                {},
-            )
-            entry.update(
-                {
-                    key: matching_activity.get(key, entry[key])
-                    for key in [
-                        "class_5_min",
-                        "non_wear_time",
-                        "timestamp",
-                        "steps",
-                        "met",
-                    ]
-                }
-            )
-
-            res.append(entry)
-    return res
-
-
-def get_patient_warnings(patient_stats: dict, yesterday_date: str) -> list:
-    """Get all warnings for a patient's health metrics.
-
-    Analyzes sleep and step data to generate warnings for:
-    - Missing data
-    - Low sleep duration (<5 hours)
-    - Abnormal sleep variation (±25% from average)
-    - Abnormal steps variation (±25% from average)
-
-    Args:
-        patient_stats (dict): Patient statistics containing:
-            - sleep_df (pd.DataFrame): Sleep data frame
-            - yesterday_sleep (float): Hours slept yesterday
-            - average_sleep (float): Average sleep hours
-            - yesterday_steps (float): Steps taken yesterday
-            - average_steps (float): Average daily steps
-        yesterday_date (str): Date string for yesterday in format 'YYYY-MM-DD'
-
-    Returns:
-        list: List of tuples (warning_message, warning_type) where warning_type is one of:
-            - 'missing_data': Missing sleep data
-            - 'low_sleep': Sleep duration < 5 hours
-            - 'sleep_variation': Abnormal sleep pattern
-            - 'steps_variation': Abnormal steps pattern
-            - 'met_variation': Abnormal MET pattern
-    """
-    warnings = []
-    sleep_df = patient_stats.get("sleep_df", pd.DataFrame())
-
-    # Sleep data availability warnings
-    if sleep_df.empty:
-        warnings.append(("No Sleep Data", "missing_data"))
-    elif yesterday_date not in sleep_df.index:
-        warnings.append(("Missing Sleep Data", "missing_data"))
-
-    if pd.isna(patient_stats["yesterday_sleep"]):
-        warnings.append(("Missing Yesterday's Sleep Data", "missing_data"))
-    elif patient_stats["yesterday_sleep"] < 5:
-        warnings.append(("Sleep < 5 hours", "low_sleep"))
-
-    if pd.isna(patient_stats.get("yesterday_steps")):
-        warnings.append(("Missing Yesterday's Steps Data", "missing_data"))
-    if pd.isna(patient_stats.get("yesterday_average_met")):
-        warnings.append(("Missing Yesterday's MET Data", "missing_data"))
-
-    # Sleep variation warning
-    if (
-        not pd.isna(patient_stats["yesterday_sleep"])
-        and not pd.isna(patient_stats["average_sleep"])
-        and patient_stats["average_sleep"] > 0
-        and (
-            patient_stats["yesterday_sleep"] < 0.75 * patient_stats["average_sleep"]
-            or patient_stats["yesterday_sleep"] > 1.25 * patient_stats["average_sleep"]
-        )
-    ):
-        warnings.append(("Sleep Variation", "sleep_variation"))
-
-    # Steps variation warning
-    if (
-        not pd.isna(patient_stats.get("yesterday_steps"))
-        and not pd.isna(patient_stats.get("average_steps"))
-        and patient_stats["average_steps"] > 0
-        and (
-            patient_stats["yesterday_steps"] < 0.75 * patient_stats["average_steps"]
-            or patient_stats["yesterday_steps"] > 1.25 * patient_stats["average_steps"]
-        )
-    ):
-        warnings.append(("Steps Variation", "steps_variation"))
-
-    # Met variation warning
-    if (
-        not pd.isna(patient_stats.get("yesterday_average_met"))
-        and not pd.isna(patient_stats.get("average_met"))
-        and patient_stats["average_met"] > 0
-        and (
-            patient_stats["yesterday_average_met"] < 0.75 * patient_stats["average_met"]
-            or patient_stats["yesterday_average_met"]
-            > 1.25 * patient_stats["average_met"]
-        )
-    ):
-        warnings.append(("MET Variation", "met_variation"))
-
-    return warnings
-
-
 def generate_subject_line(all_patient_stats: list) -> str:
-    """Generate an email subject line summarizing all patient warnings.
+    """
+    Generate an email subject line summarizing all patient warnings.
 
     Args:
-        all_patient_stats (list): List of dictionaries containing patient stats.
+        all_patient_stats (list): List of dictionaries, each with:
+            - "summary": patient summary dict
+            - "warnings": warning flags dict
+        timezone (str): Timezone string for date formatting (e.g., "America/Chicago")
 
     Returns:
-        str: Formatted subject line in format:
-            "[Warning: type1 (pat1, pat2); type2 (pat3)] on YYYY-MM-DD"
+        str: Email subject line like:
+            "[Warning: missing_data (pat1, pat2); sleep_variation (pat3)] on YYYY-MM-DD"
             or "[All Clear] for Patients: pat1, pat2 on YYYY-MM-DD"
     """
-    warnings_by_patient = {}
-    yesterday_date = get_yesterdays_date()
+    from collections import defaultdict
 
-    for patient_stats in all_patient_stats:
-        patient_name = patient_stats["patient"]
-        patient_warnings = get_patient_warnings(patient_stats, yesterday_date)
+    warning_type_to_patients = defaultdict(list)
+    yesterday = get_yesterdays_date()
 
-        if patient_warnings:
-            for warning in patient_warnings:
-                warnings_by_patient.setdefault(warning[0], []).append(patient_name)
+    for item in all_patient_stats:
+        patient = item["summary"]["patient"]
+        warnings = item["warning"]
 
-    if not warnings_by_patient:
-        patients_str = ", ".join([p["patient"] for p in all_patient_stats])
-        return f"[All Clear] for Patients: {patients_str} on {yesterday_date}"
+        for warning_type, triggered in warnings.items():
+            if triggered:
+                warning_type_to_patients[warning_type].append(patient)
 
-    # Format warnings to show which patients are affected by each type
-    warnings_str = "; ".join(
-        f"{warning} ({', '.join(sorted(patients))})"
-        for warning, patients in sorted(warnings_by_patient.items())
-    )
+    if not warning_type_to_patients:
+        all_patients = ", ".join(
+            sorted(item["summary"]["patient"] for item in all_patient_stats)
+        )
+        return f"[All Clear] for Patients: {all_patients} on {yesterday}"
 
-    return f"[Warning: {warnings_str}] on {yesterday_date}"
+    warning_chunks = [
+        f"{warn} ({', '.join(sorted(patients))})"
+        for warn, patients in sorted(warning_type_to_patients.items())
+    ]
+    return f"[Warning: {'; '.join(warning_chunks)}] on {yesterday}"
 
 
-def generate_email_body(missing_dates_dict, total_days, all_patients_stats) -> str:
+def generate_email_body(all_patient_stats: list) -> str:
+    """
+    Generate an HTML table of patient summary stats with red highlights for triggered warnings.
+
+    Args:
+        all_patient_stats (list): List of dicts each containing:
+            - "summary": dict from get_summary_stats()
+            - "warnings": dict from generate_warning_flags()
+
+    Returns:
+        str: HTML table (as a string)
+    """
     df_rows = []
-    yesterday_date = get_yesterdays_date()
 
-    for patient_stats in all_patients_stats:
-        warnings = get_patient_warnings(patient_stats, yesterday_date)
-        warning_types = [w[1] for w in warnings]
+    for entry in all_patient_stats:
+        summary = entry["summary"]
+        warnings = entry["warning"]
+        patient = summary["patient"]
 
-        if "sleep_variation" in warning_types:
-            patient = patient_stats.get("patient")
-            if patient in ["DBSOCD001", "DBSOCD002"]:
-                send_survey(patient, survey="ISS")
-
-        missing_dates = missing_dates_dict.get(patient_stats["patient"], [])
-        missing_count = len(missing_dates)
+        def style(val, flag):
+            if pd.isna(val) or warnings.get(flag, False):
+                return f'<span style="background-color: #ff5252">{val}</span>'
+            return val
 
         row = {
-            "Patient": patient_stats["patient"],
-            "Missing Days": f"{missing_count}/{total_days}",
-            "Average Sleep": f"{patient_stats['average_sleep']:.1f}",
-            "Yesterday's Sleep": f"{patient_stats['yesterday_sleep']:.1f}",
-            "Average Steps": f"{patient_stats.get('average_steps', 'N/A'):.0f}",
-            "Yesterday's Steps": f"{patient_stats.get('yesterday_steps', 'N/A'):.0f}",
-            "Yesterday's Average MET": f"{patient_stats.get('yesterday_average_met', 'N/A'):.2f}",
+            "Patient": patient,
+            "Missing Days": style(
+                f"{summary['number_of_noncompliance_days']}/{summary['number_of_days']}",
+                "has_noncompliance_days",
+            ),
+            "Average Sleep (h)": f"{summary.get('average_sleep_hours', np.nan):.1f}",
+            "Yesterday's Sleep (h)": style(
+                f"{summary.get('yesterday_sleep_hours', np.nan):.1f}", "sleep_variation"
+            ),
+            "Average Steps": f"{summary.get('average_steps', np.nan):.0f}",
+            "Yesterday's Steps": style(
+                f"{summary.get('yesterday_steps', np.nan):.0f}", "steps_variation"
+            ),
+            "Average MET": f"{summary.get('average_met', np.nan):.2f}",
+            "Yesterday's MET": style(
+                f"{summary.get('yesterday_met', np.nan):.2f}", "met_variation"
+            ),
         }
-
-        if pd.isna(patient_stats.get("yesterday_steps")):
-            row["Yesterday's Steps"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Steps"]}</span>'
-            )
-        if pd.isna(patient_stats.get("yesterday_average_met")):
-            row["Yesterday's Average MET"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Average MET"]}</span>'
-            )
-        if pd.isna(patient_stats.get("yesterday_sleep")):
-            row["Yesterday's Sleep"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Sleep"]}</span>'
-            )
-        # Add HTML highlighting based on warning types
-        if "missing_data" in warning_types:
-            row["Missing Days"] = (
-                f'<span style="background-color: #ff5252">{row["Missing Days"]}</span>'
-            )
-        if "low_sleep" in warning_types or "sleep_variation" in warning_types:
-            row["Yesterday's Sleep"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Sleep"]}</span>'
-            )
-        if "steps_variation" in warning_types:
-            row["Yesterday's Steps"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Steps"]}</span>'
-            )
-        if "met_variation" in warning_types:
-            row["Yesterday's Average MET"] = (
-                f'<span style="background-color: #ff5252">{row["Yesterday\'s Average MET"]}</span>'
-            )
 
         df_rows.append(row)
 
-    # Create DataFrame and convert to HTML
     df = pd.DataFrame(df_rows)
     return df.to_html(index=False, escape=False)
 
@@ -337,14 +182,12 @@ def main(config_file):
     smtp_port = config["smtp_port"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
-    num_past_days = config["past_days"]
     today_date = get_todays_date()
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
     email_sender.connect()
 
-    missing_dates_dict = {}
     all_patient_stats = []
     all_attachments = []
 
@@ -370,33 +213,35 @@ def main(config_file):
         # set up logger
         logger = setup_logger(patient, log)
 
-        past_dates = get_past_dates(today_date, num_past_days)
-        sleeps = merge_sleep_data(past_dates, patient_in_dir, logger)
-        data = SleepData(patient, sleeps)
+        sleep = Sleep(patient, config, patient_in_dir, patient_out_dir, logger)
+        activity = Activity(patient, config, patient_in_dir, patient_out_dir, logger)
+        master = Master(sleep, activity)
 
-        # get summary for past x days
-        stats = data.summary_stats
-        data.plot_combined_sleep_plots(patient_out_dir)
-        logger.info(
-            f"sleep combined plot for past {num_past_days} days saved to {patient_out_dir}."
-        )
+        patient_summary_stats = master.get_summary_stats()
+        warnings = master.generate_warning_flags(patient_summary_stats)
+
+        # save summary stats to file
+        summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")
+        with open(summary_stats_file, "w") as f:
+            json.dump(patient_summary_stats, f, indent=4)
+
+        master.plot_combined_sleep_and_met()
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
         all_attachments.extend(attachments)
 
-        # get non-compliant dates for the past x days
-        missing_dates = get_missing_dates(past_dates, patient_in_dir)
-
-        missing_dates_dict[patient] = missing_dates
-        all_patient_stats.append(stats)
+        all_patient_stats.append(
+            {
+                "summary": patient_summary_stats,
+                "warning": warnings,
+            }
+        )
 
         logger.info(f"Data for patient {patient} processed successfully!")
 
     # send a single email to recepients
-    email_body = generate_email_body(
-        missing_dates_dict, num_past_days, all_patient_stats
-    )
+    email_body = generate_email_body(all_patient_stats)
     subject = generate_subject_line(all_patient_stats)
     email_sender.send_email(email_recipients, subject, email_body, all_attachments)
     logger.info(f"Email for patient(s) {config['active_patients']} sent successfully!")
