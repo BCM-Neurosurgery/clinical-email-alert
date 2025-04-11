@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 import json
 import os
 import numpy as np
+import pytz
+
 
 PHASE_MAPPING = {
     "1": "Deep Sleep",
@@ -38,24 +40,35 @@ def format_seconds(seconds: int) -> str:
     return str(td)
 
 
-def get_todays_date() -> str:
-    """Get date of today
+def get_todays_date(timezone: str) -> str:
+    """
+    Get today's date in the specified timezone.
+
+    Args:
+        timezone (str): IANA timezone string, e.g. "America/Chicago"
 
     Returns:
-        str: e.g. "2024-05-01"
+        str: Date string in "YYYY-MM-DD" format, e.g. "2024-05-01"
     """
-    today = datetime.today()
-    return today.strftime("%Y-%m-%d")
+    tz = pytz.timezone(timezone)
+    now_local = datetime.now(tz)
+    return now_local.strftime("%Y-%m-%d")
 
 
-def get_yesterdays_date() -> str:
-    """Get date of yesterday.
+def get_yesterdays_date(timezone: str) -> str:
+    """
+    Get the date of yesterday in the specified timezone.
+
+    Args:
+        timezone (str): IANA timezone string, e.g. "America/Chicago"
 
     Returns:
-        str: e.g. "2024-04-30"
+        str: Date string in "YYYY-MM-DD" format, e.g. "2024-04-30"
     """
-    yesterday = datetime.today() - timedelta(days=1)
-    return yesterday.strftime("%Y-%m-%d")
+    tz = pytz.timezone(timezone)
+    now_local = datetime.now(tz)
+    yesterday_local = now_local - timedelta(days=1)
+    return yesterday_local.strftime("%Y-%m-%d")
 
 
 def get_past_dates(end_date: str, past_days: int = 7) -> list:
