@@ -383,7 +383,13 @@ class Master:
             )
             for state, color in state_colors.items()
         ]
-        ax.legend(handles=legend_handles, loc="lower right")
+        ax.legend(
+            handles=legend_handles,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1),  # move legend outside the right edge
+            borderaxespad=0.0,
+            frameon=True,
+        )
 
         fig.tight_layout()
         fig.savefig("debug_sleep_activity_plot.png", dpi=150)
