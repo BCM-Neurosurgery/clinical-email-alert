@@ -37,9 +37,9 @@ class SleepData:
         self.today_date = get_todays_date()
         self.past_dates = get_past_dates(self.today_date, self.num_past_days)
         # start date of the range, earliest
-        self.start_date = self.past_dates[-1]
+        self.start_date = self.past_dates[0]
         # end date of the range, latest
-        self.end_date = self.past_dates[0]
+        self.end_date = self.past_dates[-1]
         # this contains a series of date folders
         # e.g. "2023-07-05", "2023-07-06", ...
         self.patient_in_dir = patient_in_dir
@@ -58,6 +58,15 @@ class SleepData:
         )
         self.plot_bedtime_schedule(self.filled_splitted_bedtimes_df)
         print()
+
+    def get_start_date(self):
+        return self.start_date
+
+    def get_end_date(self):
+        return self.end_date
+
+    def get_past_dates(self):
+        return self.past_dates
 
     def ingest(self):
         """Ingests sleep data for a range of past dates.
