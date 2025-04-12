@@ -20,11 +20,13 @@ mailinglist_ids = config[
     "mailinglist_ids"
 ]  # dict of mailing list IDs (need mailing list ID and contact ID)
 mailinglistid = mailinglist_ids["OCD"]
+message_ids = config["message_ids"]
+library_id = config["library_id"]
 
 
 def send_survey(patient_id, survey="ISS"):
     """
-    Sends a specified patient a (ISS by default) survey over SMS and email immediately.
+    Sends a specified patient a survey (ISS by default) or reminder over SMS and email immediately.
     """
 
     ### EMAIL SURVEY:
@@ -37,8 +39,8 @@ def send_survey(patient_id, survey="ISS"):
     # Define the payload (data)
     payload = {
         "message": {
-            # "messageId": "MS_0Vdgn7nLGSQBlYN", # for a preset message in Qualtrics
-            "messageText": "From Baylor Neurosurgery, please fill out this survey as soon as you can: ${l://SurveyURL}"
+            # "messageId": message_ids['email_survey'] # for a preset message in Qualtrics
+            "messageText": "From Baylor Neurosurgery, please fill out this survey as soon as you can:# ${l://SurveyURL}"
         },
         "recipients": {
             "mailingListId": mailinglistid,  # can specify a group/list or a single contact
@@ -84,7 +86,7 @@ def send_survey(patient_id, survey="ISS"):
     payload = {
         "message": {
             # "libraryId": "UR_1M4aHozEkSxUfCl",
-            # "messageId": "MS_0Vdgn7nLGSQBlYN", # can either load preset messageID or include text directly
+            # "messageId": message_ids['email_survey'], # can either load preset messageID or include text directly
             "messageText": "From Baylor Neurosurgery ("
             + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
             + "), please fill out this survey as soon as you can: ${l://SurveyURL}"  # add timestamp to message otherwise it filters out duplicates
@@ -94,6 +96,93 @@ def send_survey(patient_id, survey="ISS"):
             "contactId": patient_ids[patient_id],
         },
         "surveyId": survey_ids[survey],
+        "sendDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "method": "Invite",
+        "name": "SMS API Trigger",
+    }
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, json=payload)
+
+    # Print the response
+    print("SMS response: ", response.json())
+
+
+def send_wearable_reminder(patient_id):
+    """
+    Sends a specified patient a reminder to wear their Oura Ring by email and SMS
+    """
+
+    ### EMAIL SURVEY:
+    # Define the API URL
+    url = "https://iad1.qualtrics.com/API/v3/distributions"
+
+    # Define the headers
+    headers = {"Content-Type": "application/json", "X-API-TOKEN": token}
+
+    # Define the payload (data)
+    payload = {
+        "message": {
+            # "libraryId": library_id,
+            # "messageId": message_ids['wearable_reminder_email'], # for a preset message in Qualtrics
+            "messageText": "From Baylor Neurosurgery ("
+            + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+            + "), we hope you are doing well. We noticed a lack of Oura Ring data coming in, please fill out this survey if there is anything you would like to tell us: ${l://SurveyURL}"
+        },
+        "recipients": {
+            "mailingListId": mailinglistid,  # can specify a group/list or a single contact
+            "contactId": patient_ids[patient_id],
+        },
+        "header": {
+            "fromEmail": "u242046@bcm.edu",  # Thomas Baylor email
+            "replyToEmail": "u242046@bcm.edu",  # Thomas Baylor email
+            "fromName": "Baylor Neurosurgery",
+            "subject": "Lack of wearable data coming in - "
+            + datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M"
+            ),  # add timestamp to message otherwise it filters out duplicates
+        },
+        "surveyLink": {
+            "surveyId": survey_ids["Short_Response"],
+            # "expirationDate": datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'), # should we have an expiration date
+            "type": "Individual",
+        },
+        "sendDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, json=payload)
+
+    # Print the response
+    print(
+        "Email response: ", response.json()
+    )  # Assuming the response is in JSON format
+
+    ### SMS SURVEY
+    # Define the API URL
+    url = "https://iad1.qualtrics.com/API/v3/distributions/sms"
+
+    # Define the headers
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-API-TOKEN": token,  # Replace with your actual API token
+    }
+
+    # Define the payload (data)
+    payload = {
+        "message": {
+            # "libraryId": library_id,
+            # "messageId": message_ids['wearable_reminder_sms'], # can either load preset messageID or include text directly
+            "messageText": "From Baylor Neurosurgery ("
+            + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+            + "), we hope you are doing well. We noticed a lack of Oura Ring data coming in, please fill out this survey if there is anything we should know: ${l://SurveyURL}"  # add timestamp to message otherwise it filters out duplicates
+        },
+        "recipients": {
+            "mailingListId": mailinglistid,
+            "contactId": patient_ids[patient_id],
+        },
+        "surveyId": survey_ids["Short_Response"],
         "sendDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "method": "Invite",
         "name": "SMS API Trigger",
