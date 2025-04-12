@@ -25,6 +25,10 @@ class Activity:
         self.num_past_days = config["past_days"]
         self.today_date = get_todays_date()
         self.past_dates = get_past_dates(self.today_date, self.num_past_days)
+        # often the daily_activity.json in the date folder records the daily activity
+        # starting at 4am on that day, which would make the early part of the earliest
+        # date missing when we join later, so we should go past that date further
+        self.iter_past_dates = get_past_dates(self.today_date, self.num_past_days + 2)
         # start date of the range, earliest
         self.start_date = self.past_dates[-1]
         # end date of the range, latest
@@ -62,7 +66,7 @@ class Activity:
         self.met = []
         self.steps = []
 
-        for date in self.past_dates:
+        for date in self.iter_past_dates:
             patient_date_json = os.path.join(
                 self.patient_in_dir, date, "daily_activity.json"
             )
