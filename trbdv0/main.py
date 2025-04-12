@@ -97,9 +97,7 @@ def generate_subject_line(all_patient_stats: list) -> str:
         return f"[All Clear] for Patients: {patients_str} on {yesterday}"
 
     flagged_str = ", ".join(sorted(needs_attention))
-    return (
-        f"[Warning: {flagged_str} need review] on {yesterday}"
-    )
+    return f"[Warning: {flagged_str} need review] on {yesterday}"
 
 
 def generate_email_body(all_patient_stats: list) -> str:
@@ -164,7 +162,16 @@ def generate_email_body(all_patient_stats: list) -> str:
         df_rows.append(row)
 
     df = pd.DataFrame(df_rows)
-    return df.to_html(index=False, escape=False)
+    html_table = df.to_html(index=False, escape=False)
+
+    note = (
+        "<p style='font-size: 0.9em; color: #555;'>"
+        "<strong>Note:</strong> Cells highlighted in red indicate "
+        "either <em>missing data</em> or values that deviate more than ±25% from the patient's average."
+        "</p>"
+    )
+
+    return html_table + note
 
 
 def get_attachments(dir: str):
