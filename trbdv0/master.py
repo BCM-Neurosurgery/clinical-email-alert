@@ -254,48 +254,50 @@ class Master:
                 - met: float MET value if available
         """
         # Base timeline
-        timeline = self.build_time_grid()
+        df = self.build_time_grid().copy()
 
         # Sleep bedtimes
         df_in_bed = self.build_master_sleep_bedtimes()
-        df_in_bed["in_bed"] = True
+        if not df_in_bed.empty:
+            df_in_bed["in_bed"] = True
+            df = df.merge(
+                df_in_bed[["timestamp", "in_bed"]], on="timestamp", how="left"
+            )
 
         # Sleep phases
         df_sleep_phase = self.build_master_sleep_phases()
+        if not df_sleep_phase.empty:
+            df = df.merge(
+                df_sleep_phase[["timestamp", "phase", "phase_label"]],
+                on="timestamp",
+                how="left",
+            )
 
         # Activity class
         df_activity = self.build_master_activity_phase()
+        if not df_activity.empty:
+            df = df.merge(
+                df_activity[["timestamp", "activity_class", "activity_label"]],
+                on="timestamp",
+                how="left",
+            )
 
         # MET data
         df_met = self.build_master_met()
-
-        # Merge one by one
-        df = timeline.merge(
-            df_in_bed[["timestamp", "in_bed"]], on="timestamp", how="left"
-        )
-        df = df.merge(
-            df_sleep_phase[["timestamp", "phase", "phase_label"]],
-            on="timestamp",
-            how="left",
-        )
-        df = df.merge(
-            df_activity[["timestamp", "activity_class", "activity_label"]],
-            on="timestamp",
-            how="left",
-        )
-        df = df.merge(df_met[["timestamp", "met"]], on="timestamp", how="left")
+        if not df_met.empty:
+            df = df.merge(df_met[["timestamp", "met"]], on="timestamp", how="left")
 
         # 8. Fill default values
-        df["in_bed"] = df["in_bed"].astype("boolean").fillna(False)
+        if "in_bed" in df.columns:
+            df["in_bed"] = df["in_bed"].astype("boolean").fillna(False)
 
         # 9. Add day field
         df["day"] = df["timestamp"].dt.date
 
-        # 10. Optional: rename for clarity
-        df.rename(
-            columns={"phase": "sleep_phase", "phase_label": "sleep_phase_label"},
-            inplace=True,
-        )
+        if "phase" in df.columns:
+            df.rename(columns={"phase": "sleep_phase"}, inplace=True)
+        if "phase_label" in df.columns:
+            df.rename(columns={"phase_label": "sleep_phase_label"}, inplace=True)
 
         return df
 
@@ -322,6 +324,11 @@ class Master:
         df = self.master_integrated_time
         if df.empty:
             print("No data to plot.")
+            return
+        # if there's no in_bed column
+        # that means there's no sleep data
+        if "in_bed" not in df.columns:
+            print("No sleep data to plot.")
             return
 
         df = df.copy()
@@ -549,8 +556,11 @@ class Master:
         """
         df = self.master_integrated_time
 
-        if df.empty or "day" not in df.columns:
-            raise ValueError("master_integrated_time must have a 'day' column.")
+        if df.empty or "in_bed" not in df.columns:
+            self.logger.error(
+                "plot_combined_sleep_and_met error: No sleep data available."
+            )
+            return
 
         days = sorted(df["day"].unique())
         height = max(6, len(days) * 0.4)
@@ -589,8 +599,11 @@ class Master:
             float: Average sleep duration in hours per day.
         """
         df = self.master_integrated_time
-        if df.empty or "day" not in df.columns:
-            raise ValueError("Input DataFrame must include 'day' column.")
+        if df.empty or "in_bed" not in df.columns:
+            self.logger.error(
+                "compute_average_sleep_hours error: No sleep data available."
+            )
+            return np.nan
 
         df = df.copy()
         df["state"] = df.apply(self.assign_state, axis=1)
@@ -617,8 +630,8 @@ class Master:
             float: Total sleep hours for yesterday.
         """
         df = self.master_integrated_time
-        if df.empty or "day" not in df.columns:
-            raise ValueError("Input DataFrame must include 'day' column.")
+        if df.empty or "in_bed" not in df.columns:
+            return np.nan
 
         yesterday = datetime.strptime(
             get_yesterdays_date(self.timezone), "%Y-%m-%d"
@@ -723,7 +736,8 @@ class Master:
         """
         df = self.master_integrated_time
 
-        if df.empty or "day" not in df.columns or "met" not in df.columns:
+        if df.empty or "met" not in df.columns:
+            self.logger.error("compute_yesterdays_met error: No MET data available.")
             return np.nan
 
         yesterday = datetime.strptime(
