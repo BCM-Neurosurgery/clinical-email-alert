@@ -67,43 +67,39 @@ def setup_logger(name, file_path, level=logging.INFO):
 
 def generate_subject_line(all_patient_stats: list) -> str:
     """
-    Generate an email subject line summarizing all patient warnings.
+    Generate a concise subject line for doctors, listing patients needing attention,
+    and briefly noting all-clear patients.
 
     Args:
-        all_patient_stats (list): List of dictionaries, each with:
-            - "summary": patient summary dict
-            - "warnings": warning flags dict
-        timezone (str): Timezone string for date formatting (e.g., "America/Chicago")
+        all_patient_stats (list): Each dict has:
+            - "summary": patient summary
+            - "warnings": dict of flags
 
     Returns:
-        str: Email subject line like:
-            "[Warning: missing_data (pat1, pat2); sleep_variation (pat3)] on YYYY-MM-DD"
-            or "[All Clear] for Patients: pat1, pat2 on YYYY-MM-DD"
+        str: Subject line
     """
-    from collections import defaultdict
-
-    warning_type_to_patients = defaultdict(list)
     yesterday = get_yesterdays_date()
 
-    for item in all_patient_stats:
-        patient = item["summary"]["patient"]
-        warnings = item["warning"]
+    needs_attention = []
+    all_clear = []
 
-        for warning_type, triggered in warnings.items():
-            if triggered:
-                warning_type_to_patients[warning_type].append(patient)
+    for entry in all_patient_stats:
+        patient = entry["summary"]["patient"]
+        warnings = entry["warning"]
 
-    if not warning_type_to_patients:
-        all_patients = ", ".join(
-            sorted(item["summary"]["patient"] for item in all_patient_stats)
-        )
-        return f"[All Clear] for Patients: {all_patients} on {yesterday}"
+        if any(warnings.values()):
+            needs_attention.append(patient)
+        else:
+            all_clear.append(patient)
 
-    warning_chunks = [
-        f"{warn} ({', '.join(sorted(patients))})"
-        for warn, patients in sorted(warning_type_to_patients.items())
-    ]
-    return f"[Warning: {'; '.join(warning_chunks)}] on {yesterday}"
+    if not needs_attention:
+        patients_str = ", ".join(sorted(all_clear))
+        return f"[All Clear] for Patients: {patients_str} on {yesterday}"
+
+    flagged_str = ", ".join(sorted(needs_attention))
+    return (
+        f"[Warning: {flagged_str} need review] on {yesterday}"
+    )
 
 
 def generate_email_body(all_patient_stats: list) -> str:
@@ -125,8 +121,8 @@ def generate_email_body(all_patient_stats: list) -> str:
         warnings = entry["warning"]
         patient = summary["patient"]
 
-        def style(val, flag):
-            if pd.isna(val) or warnings.get(flag, False):
+        def style(val, *flags):
+            if pd.isna(val) or any(warnings.get(flag, False) for flag in flags):
                 return f'<span style="background-color: #ff5252">{val}</span>'
             return val
 
@@ -136,17 +132,32 @@ def generate_email_body(all_patient_stats: list) -> str:
                 f"{summary['number_of_noncompliance_days']}/{summary['number_of_days']}",
                 "has_noncompliance_days",
             ),
-            "Average Sleep (h)": f"{summary.get('average_sleep_hours', np.nan):.1f}",
+            "Average Sleep (h)": style(
+                f"{summary.get('average_sleep_hours', np.nan):.1f}",
+                "average_sleep_nan",
+            ),
             "Yesterday's Sleep (h)": style(
-                f"{summary.get('yesterday_sleep_hours', np.nan):.1f}", "sleep_variation"
+                f"{summary.get('yesterday_sleep_hours', np.nan):.1f}",
+                "sleep_variation",
+                "yesterday_sleep_nan",
             ),
-            "Average Steps": f"{summary.get('average_steps', np.nan):.0f}",
+            "Average Steps": style(
+                f"{summary.get('average_steps', np.nan):.0f}",
+                "average_steps_nan",
+            ),
             "Yesterday's Steps": style(
-                f"{summary.get('yesterday_steps', np.nan):.0f}", "steps_variation"
+                f"{summary.get('yesterday_steps', np.nan):.0f}",
+                "steps_variation",
+                "yesterday_steps_nan",
             ),
-            "Average MET": f"{summary.get('average_met', np.nan):.2f}",
+            "Average MET": style(
+                f"{summary.get('average_met', np.nan):.2f}",
+                "average_met_nan",
+            ),
             "Yesterday's MET": style(
-                f"{summary.get('yesterday_met', np.nan):.2f}", "met_variation"
+                f"{summary.get('yesterday_met', np.nan):.2f}",
+                "met_variation",
+                "yesterday_met_nan",
             ),
         }
 

@@ -827,7 +827,12 @@ class Master:
         non_compliance_days = summary.get("number_of_noncompliance_days")
 
         return {
-            "missing_data": any(pd.isna(v) for v in [y_sleep, y_steps, y_met]),
+            "yesterday_sleep_nan": pd.isna(y_sleep),
+            "yesterday_steps_nan": pd.isna(y_steps),
+            "yesterday_met_nan": pd.isna(y_met),
+            "average_sleep_nan": pd.isna(avg_sleep),
+            "average_steps_nan": pd.isna(avg_steps),
+            "average_met_nan": pd.isna(avg_met),
             "has_noncompliance_days": non_compliance_days > 0,
             "sleep_variation": (
                 not pd.isna(y_sleep)
