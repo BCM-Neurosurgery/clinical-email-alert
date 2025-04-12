@@ -138,6 +138,7 @@ def generate_email_body(all_patient_stats: list) -> str:
                 f"{summary.get('yesterday_sleep_hours', np.nan):.1f}",
                 "sleep_variation",
                 "yesterday_sleep_nan",
+                "yesterday_sleep_less_than_5",
             ),
             "Average Steps": style(
                 f"{summary.get('average_steps', np.nan):.0f}",
@@ -167,7 +168,7 @@ def generate_email_body(all_patient_stats: list) -> str:
     note = (
         "<p style='font-size: 0.9em; color: #555;'>"
         "<strong>Note:</strong> Cells highlighted in red indicate "
-        "either <em>missing data</em> or values that deviate more than ±25% from the patient's average."
+        "either <em>missing data</em> or sleep < 5 hours, or values that deviate more than ±25% from the patient's average."
         "</p>"
     )
 
