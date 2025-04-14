@@ -860,7 +860,7 @@ class Master:
             "average_steps_nan": pd.isna(avg_steps),
             "average_met_nan": pd.isna(avg_met),
             "has_noncompliance_days": non_compliance_days > 0,
-            "yesterday_sleep_less_than_5": y_sleep < 5,
+            "yesterday_sleep_less_than_6": y_sleep < 6,
             "yesterday_non_wear_time_over_8: ": y_non_wear_time > 8 * 3600,
             "sleep_variation": (
                 not pd.isna(y_sleep)

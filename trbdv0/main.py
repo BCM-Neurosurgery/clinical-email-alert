@@ -138,7 +138,7 @@ def generate_email_body(all_patient_stats: list) -> str:
                 f"{summary.get('yesterday_sleep_hours', np.nan):.1f}",
                 "sleep_variation",
                 "yesterday_sleep_nan",
-                "yesterday_sleep_less_than_5",
+                "yesterday_sleep_less_than_6",
             ),
             "Average Steps": style(
                 f"{summary.get('average_steps', np.nan):.0f}",
@@ -240,8 +240,10 @@ def main(config_file):
         warnings = master.generate_warning_flags(patient_summary_stats)
 
         # send quatrics survey if sleep_variation is triggered
-        if warnings["sleep_variation"]:
-            logger.info(f"sleep_variation triggered, sending survey to {patient}...")
+        if warnings["sleep_variation"] or warnings["yesterday_sleep_less_than_6"]:
+            logger.info(
+                f"sleep_variation or yesterday_sleep_less_than_6 triggered, sending survey to {patient}..."
+            )
             send_survey(patient)
 
         # send quatrics survey if non_wear_time is triggered
