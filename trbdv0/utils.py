@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta
 import json
-import os
-import numpy as np
 import pytz
 
 
@@ -115,59 +113,36 @@ def read_config(config_file: str) -> dict:
     return config
 
 
-def get_missing_dates(dates: list, patient_dir: str) -> list:
-    """Return a list of missing dates in the dates list
+def validate_config_keys(config: dict) -> None:
+    """
+    Validate that the required keys are present in the configuration dictionary.
 
     Args:
-        dates (list): e.g. ["2023-06-23", "2023-06-24", ...]
-        patient_dir (str): patient dir that contains all data,
-            e.g. "./oura/Percept004/"
+        config (dict): The loaded JSON configuration dictionary.
 
-    Returns:
-        list: ["2023-06-23", "2023-06-24"]
+    Raises:
+        KeyError: If any required key is missing from the configuration.
+
+    Example:
+        >>> with open("config.json") as f:
+        ...     config = json.load(f)
+        >>> validate_config_keys(config)
     """
-    res = []
-    for date in dates:
-        patient_date_json = os.path.join(patient_dir, date, "sleep.json")
-        if not os.path.exists(patient_date_json):
-            res.append(date)
-    return res
+    required_keys = [
+        "input_dir",
+        "output_dir",
+        "log_dir",
+        "timezone",
+        "email_recipients",
+        "smtp_server",
+        "smtp_port",
+        "smtp_user",
+        "smtp_password",
+        "past_days",
+        "active_patients",
+    ]
 
+    missing_keys = [key for key in required_keys if key not in config]
 
-def calculate_average_met(activity_data: dict) -> float:
-    """
-    Calculate the average MET value for periods when the ring was worn.
-
-    Parameters:
-    activity_data (dict): A dictionary containing activity classification ('class_5_min')
-                          and MET ('met') data. E.g. {'day': '2025-02-06',
-                          'sleep_phase_5_min': '444222211111233322211111111222333332224444222222222123333333222222422334222222',
-                          'bedtime_start': '2025-02-05T23:45:02-05:00', 'bedtime_end': '2025-02-06T06:14:25-05:00',
-                          'class_5_min': '1111111111111111111111111133221222322200000000000000000000000000333300032222222334334...',
-                          'non_wear_time': 15600, 'timestamp': '2025-02-06T04:00:00-05:00',
-                          'steps': 6674, 'met': {'interval': 60.0, 'items': [...], 'timestamp': '2025-02-06T04:00:00.000-05:00'}}
-
-    Returns:
-    float or None: The average MET value for periods when the ring was worn,
-                   or None if no valid MET values exist.
-    """
-    class_5_min = np.array([int(c) for c in activity_data["class_5_min"]])
-    met_items = np.array(
-        [float(m) if m is not None else np.nan for m in activity_data["met"]["items"]],
-        dtype=float,
-    )
-
-    interval_seconds = int(activity_data["met"]["interval"])
-    samples_per_class = 300 // interval_seconds
-
-    # Expand class_5_min values to match MET sampling rate
-    expanded_class = np.repeat(class_5_min, samples_per_class)
-
-    # Ensure the expanded class and MET items have the same length
-    min_length = min(len(expanded_class), len(met_items))
-    expanded_class = expanded_class[:min_length]
-    met_items = met_items[:min_length]
-
-    valid_met_items = met_items[expanded_class != 0]
-
-    return np.nanmean(valid_met_items) if valid_met_items.size > 0 else None
+    if missing_keys:
+        raise KeyError(f"Missing required config keys: {', '.join(missing_keys)}")
