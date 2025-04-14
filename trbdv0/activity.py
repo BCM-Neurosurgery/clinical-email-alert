@@ -65,6 +65,7 @@ class Activity:
         self.activity_phases = []
         self.met = []
         self.steps = []
+        self.nonweartime = []
 
         for date in self.iter_past_dates:
             patient_date_json = os.path.join(
@@ -103,6 +104,13 @@ class Activity:
                 self.steps.append(
                     {
                         "steps": entry["steps"],
+                        "timestamp": entry["timestamp"],
+                    }
+                )
+
+                self.nonweartime.append(
+                    {
+                        "non_wear_time": entry["non_wear_time"],
                         "timestamp": entry["timestamp"],
                     }
                 )

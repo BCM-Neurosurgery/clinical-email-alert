@@ -774,6 +774,35 @@ class Master:
                 res.append(date)
         return res
 
+    def get_yesterday_non_wear_time(self) -> int:
+        """
+        Returns the total non-wear time for yesterday in seconds.
+
+        Returns:
+            int: Total non-wear time in seconds, or np.nan if no data.
+        """
+        if not self.activity.nonweartime:
+            return np.nan
+
+        yesterday = datetime.strptime(
+            get_yesterdays_date(self.timezone), "%Y-%m-%d"
+        ).date()
+
+        df = pd.DataFrame(self.activity.nonweartime)
+
+        if "non_wear_time" not in df.columns or "timestamp" not in df.columns:
+            return np.nan
+
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["day"] = df["timestamp"].dt.date
+
+        df_yesterday = df[df["day"] == yesterday]
+
+        if df_yesterday.empty:
+            return np.nan
+
+        return int(df_yesterday["non_wear_time"].sum())
+
     def get_summary_stats(self) -> dict:
         """
         Returns a dictionary of daily summary statistics including:
@@ -794,6 +823,7 @@ class Master:
             "yesterdays_date": get_yesterdays_date(),
             "average_sleep_hours": self.compute_average_sleep_hours(),
             "yesterday_sleep_hours": self.compute_yesterday_sleep_hours(),
+            "yesterday_non_wear_time_s": self.get_yesterday_non_wear_time(),
             "average_steps": self.compute_average_steps(),
             "yesterday_steps": self.compute_yesterdays_steps(),
             "average_met": self.compute_average_met(),
@@ -811,12 +841,7 @@ class Master:
             summary (dict): Output from get_summary_stats()
 
         Returns:
-            dict: {
-                "missing_data": bool,
-                "sleep_variation": bool,
-                "steps_variation": bool,
-                "met_variation": bool
-            }
+            dict: Dictionary of warning flags with boolean values
         """
         y_sleep = summary.get("yesterday_sleep_hours")
         avg_sleep = summary.get("average_sleep_hours")
@@ -825,6 +850,7 @@ class Master:
         y_met = summary.get("yesterday_met")
         avg_met = summary.get("average_met")
         non_compliance_days = summary.get("number_of_noncompliance_days")
+        y_non_wear_time = summary.get("yesterday_non_wear_time_s")
 
         return {
             "yesterday_sleep_nan": pd.isna(y_sleep),
@@ -835,6 +861,7 @@ class Master:
             "average_met_nan": pd.isna(avg_met),
             "has_noncompliance_days": non_compliance_days > 0,
             "yesterday_sleep_less_than_5": y_sleep < 5,
+            "yesterday_non_wear_time_over_8: ": y_non_wear_time > 8 * 3600,
             "sleep_variation": (
                 not pd.isna(y_sleep)
                 and not pd.isna(avg_sleep)

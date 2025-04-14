@@ -24,7 +24,7 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 import pandas as pd
 from trbdv0.send_email import EmailSender
-from trbdv0.survey_automation import send_survey
+from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import numpy as np
 import json
@@ -238,6 +238,18 @@ def main(config_file):
 
         patient_summary_stats = master.get_summary_stats()
         warnings = master.generate_warning_flags(patient_summary_stats)
+
+        # send quatrics survey if sleep_variation is triggered
+        if warnings["sleep_variation"]:
+            logger.info(f"sleep_variation triggered, sending survey to {patient}...")
+            send_survey(patient)
+
+        # send quatrics survey if non_wear_time is triggered
+        if warnings["yesterday_non_wear_time_over_8"]:
+            logger.info(
+                f"yesterday_non_wear_time_over_8 triggered, sending survey to {patient}..."
+            )
+            send_wearable_reminder(patient)
 
         # save summary stats to file
         summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")
