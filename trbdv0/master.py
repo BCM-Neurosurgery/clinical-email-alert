@@ -643,6 +643,9 @@ class Master:
         sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
         sleep_df = df[(df["day"] == yesterday) & (df["state"].isin(sleep_states))]
 
+        if sleep_df.empty:
+            return np.nan
+
         sleep_minutes = len(sleep_df)
         sleep_hours = sleep_minutes / 60.0
 
