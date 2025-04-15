@@ -95,19 +95,19 @@ def main(config_file):
         patient_summary_stats = master.get_summary_stats()
         warnings = master.generate_warning_flags(patient_summary_stats)
 
-        # # send quatrics survey if sleep_variation is triggered
-        # if warnings["sleep_variation"] or warnings["yesterday_sleep_less_than_6"]:
-        #     logger.info(
-        #         f"sleep_variation or yesterday_sleep_less_than_6 triggered, sending survey to {patient}..."
-        #     )
-        #     send_survey(patient)
+        # send quatrics survey if sleep_variation is triggered
+        if warnings["sleep_variation"] or warnings["yesterday_sleep_less_than_6"]:
+            logger.info(
+                f"sleep_variation or yesterday_sleep_less_than_6 triggered, sending survey to {patient}..."
+            )
+            send_survey(patient)
 
-        # # send quatrics survey if non_wear_time is triggered
-        # if warnings["yesterday_non_wear_time_over_8"]:
-        #     logger.info(
-        #         f"yesterday_non_wear_time_over_8 triggered, sending survey to {patient}..."
-        #     )
-        #     send_wearable_reminder(patient)
+        # send quatrics survey if non_wear_time is triggered
+        if warnings["yesterday_non_wear_time_over_8"]:
+            logger.info(
+                f"yesterday_non_wear_time_over_8 triggered, sending survey to {patient}..."
+            )
+            send_wearable_reminder(patient)
 
         # save summary stats to file
         summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")
