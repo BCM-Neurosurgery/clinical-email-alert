@@ -19,15 +19,18 @@ survey_ids = config["survey_ids"]  # dict of survey IDs
 mailinglist_ids = config[
     "mailinglist_ids"
 ]  # dict of mailing list IDs (need mailing list ID and contact ID)
-mailinglistid = mailinglist_ids["OCD"]
 message_ids = config["message_ids"]
-library_id = config["library_id"]
+# library_id = config["library_id"]
 
 
 def send_survey(patient_id, survey="ISS"):
     """
     Sends a specified patient a survey (ISS by default) or reminder over SMS and email immediately.
     """
+    if patient_id[0] == "T":
+        mailinglistid = mailinglist_ids["TRBD"]
+    else:
+        mailinglistid = mailinglist_ids["OCD"]
 
     ### EMAIL SURVEY:
     # Define the API URL
@@ -112,6 +115,10 @@ def send_wearable_reminder(patient_id):
     """
     Sends a specified patient a reminder to wear their Oura Ring by email and SMS
     """
+    if patient_id[0] == "T":
+        mailinglistid = mailinglist_ids["TRBD"]
+    else:
+        mailinglistid = mailinglist_ids["OCD"]
 
     ### EMAIL SURVEY:
     # Define the API URL

@@ -667,7 +667,8 @@ class Master:
         if "steps" not in df.columns or "timestamp" not in df.columns:
             return np.nan
 
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+        df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
 
         # Group by day and sum steps per day
@@ -697,7 +698,8 @@ class Master:
             return np.nan
 
         # Parse timestamps and extract day
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+        df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
 
         # Filter for yesterday's entries
@@ -748,7 +750,6 @@ class Master:
         ).date()
 
         df = df.copy()
-        df["day"] = pd.to_datetime(df["day"]).dt.date
 
         df_yesterday = df[df["day"] == yesterday]
 
@@ -796,7 +797,8 @@ class Master:
         if "non_wear_time" not in df.columns or "timestamp" not in df.columns:
             return np.nan
 
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+        df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
 
         df_yesterday = df[df["day"] == yesterday]
