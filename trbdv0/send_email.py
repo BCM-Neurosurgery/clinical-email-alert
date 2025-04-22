@@ -67,9 +67,7 @@ def generate_subject_line(all_patient_stats: list) -> str:
     and briefly noting all-clear patients.
 
     Args:
-        all_patient_stats (list): Each dict has:
-            - "summary": patient summary
-            - "warnings": dict of flags
+        all_patient_stats (list): list of dicts
 
     Returns:
         str: Subject line
@@ -78,6 +76,11 @@ def generate_subject_line(all_patient_stats: list) -> str:
 
     needs_attention = []
     all_clear = []
+
+    # all belong to the same study name for now
+    # different than study ids on Elias, only
+    # for email showing purpose
+    study_name = all_patient_stats[0]["summary"]["study_name"]
 
     for entry in all_patient_stats:
         patient = entry["summary"]["patient"]
@@ -90,10 +93,10 @@ def generate_subject_line(all_patient_stats: list) -> str:
 
     if not needs_attention:
         patients_str = ", ".join(sorted(all_clear))
-        return f"[All Clear] for Patients: {patients_str} on {yesterday}"
+        return f"{study_name} [All Clear] for Patients: {patients_str} on {yesterday}"
 
     flagged_str = ", ".join(sorted(needs_attention))
-    return f"[Warning: {flagged_str} need review] on {yesterday}"
+    return f"{study_name} [Warning: {flagged_str} need review] on {yesterday}"
 
 
 def generate_email_body(all_patient_stats: list) -> str:

@@ -142,6 +142,7 @@ def validate_config_keys(config: dict) -> None:
         "active_patients",
         "quatrics_sleep_reminder",
         "quatrics_nonwear_reminder",
+        "study_name",
     ]
 
     missing_keys = [key for key in required_keys if key not in config]

@@ -17,6 +17,7 @@ class Master:
         self.activity = activity
         self.timezone = timezone
         self.logger = self.sleep.logger
+        self.study_name = self.sleep.study_name
         self.patient = self.sleep.get_patient()
         self.plot_save_path = os.path.join(
             self.sleep.patient_out_dir, f"{self.patient}.png"
@@ -810,20 +811,14 @@ class Master:
 
     def get_summary_stats(self) -> dict:
         """
-        Returns a dictionary of daily summary statistics including:
-            - average_sleep_hours
-            - yesterday_sleep_hours
-            - average_steps
-            - yesterday_steps
-            - average_met
-            - yesterday_met
-            - missing_sleep_dates
+        Returns a dictionary of daily summary statistics
 
         Returns:
             dict: Summary stats with float or np.nan values
         """
         return {
             "patient": self.patient,
+            "study_name": self.study_name,
             "todays_date": get_todays_date(),
             "yesterdays_date": get_yesterdays_date(),
             "average_sleep_hours": self.compute_average_sleep_hours(),

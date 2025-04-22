@@ -26,6 +26,7 @@ class Sleep:
         self.patient = patient
         self.config = config
         self.num_past_days = config["past_days"]
+        self.study_name = config["study_name"]
         self.today_date = get_todays_date()
         self.past_dates = get_past_dates(self.today_date, self.num_past_days)
         # start date of the range, earliest
