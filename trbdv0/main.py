@@ -50,6 +50,7 @@ def main(config_file):
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     timezone = config["timezone"]
+    quatrics_patients = config["quatrics_patients"]
     timestamp = datetime.now(pytz.timezone(timezone))
     timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
     today_date = get_todays_date()
@@ -97,7 +98,7 @@ def main(config_file):
 
         # send quatrics survey if sleep_variation is triggered
         if warnings["sleep_variation"] or warnings["yesterday_sleep_less_than_6"]:
-            if patient in ["DBSOCD001", "DBSOCD002", "TRBD001"]:
+            if patient in quatrics_patients:
                 logger.info(
                     f"sleep_variation or yesterday_sleep_less_than_6 triggered, sending survey to {patient}..."
                 )
@@ -105,7 +106,7 @@ def main(config_file):
 
         # send quatrics survey if non_wear_time is triggered
         if warnings["yesterday_non_wear_time_over_8"]:
-            if patient in ["DBSOCD001", "DBSOCD002", "TRBD001"]:
+            if patient in quatrics_patients:
                 logger.info(
                     f"yesterday_non_wear_time_over_8 triggered, sending survey to {patient}..."
                 )
