@@ -6,6 +6,7 @@ from utils import (
     get_todays_date,
     get_past_dates,
     read_json,
+    get_iter_dates,
 )
 import pytz
 
@@ -29,6 +30,7 @@ class Sleep:
         self.study_name = config["study_name"]
         self.today_date = get_todays_date()
         self.past_dates = get_past_dates(self.today_date, self.num_past_days)
+        self.iter_past_dates = get_iter_dates(self.today_date, self.num_past_days + 2)
         # start date of the range, earliest
         self.start_date = self.past_dates[0]
         # end date of the range, latest
@@ -91,7 +93,7 @@ class Sleep:
         self.sleep_data = []
         self.bedtimes = []
 
-        for date in self.past_dates:
+        for date in self.iter_past_dates:
             patient_date_json = os.path.join(self.patient_in_dir, date, "sleep.json")
 
             if not os.path.exists(patient_date_json):

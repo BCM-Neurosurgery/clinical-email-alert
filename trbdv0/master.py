@@ -28,8 +28,6 @@ class Master:
         self.patient = self.sleep.get_patient()
         self.timegrid = self.build_time_grid()
         self.master_integrated_time = self.build_master_integrated_time()
-        # self.plot_met_buckets_gantt()
-        self.plot_integrated_sleep_activity_schedule()
 
     def build_time_grid(self) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
@@ -334,7 +332,7 @@ class Master:
 
         df = df.copy()
         # hour as float, since we are plotting on hours
-        df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60
+        df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0
         days = sorted(df["day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 

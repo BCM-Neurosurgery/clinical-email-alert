@@ -1,5 +1,10 @@
 import os
-from utils import read_json, get_past_dates, get_todays_date
+from utils import (
+    read_json,
+    get_past_dates,
+    get_todays_date,
+    get_iter_dates,
+)
 import numpy as np
 
 
@@ -28,7 +33,7 @@ class Activity:
         # often the daily_activity.json in the date folder records the daily activity
         # starting at 4am on that day, which would make the early part of the earliest
         # date missing when we join later, so we should go past that date further
-        self.iter_past_dates = get_past_dates(self.today_date, self.num_past_days + 2)
+        self.iter_past_dates = get_iter_dates(self.today_date, self.num_past_days + 2)
         # start date of the range, earliest
         self.start_date = self.past_dates[-1]
         # end date of the range, latest

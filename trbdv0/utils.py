@@ -86,6 +86,23 @@ def get_past_dates(end_date: str, past_days: int = 7) -> list:
     return [date.strftime("%Y-%m-%d") for date in sorted_dates]
 
 
+def get_iter_dates(end_date: str, past_days: int = 7) -> list:
+    """
+    Get a list of dates including both the start and end date.
+
+    Args:
+        end_date (str): The end date in "YYYY-MM-DD" format (included in result).
+        past_days (int): Number of days before the end_date to include (inclusive of end_date). Default is 7.
+
+    Returns:
+        list: A list of dates (as strings) in "YYYY-MM-DD" format,
+              sorted from earliest to latest, inclusive of both start and end date.
+    """
+    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    date_list = [end_date_dt - timedelta(days=x) for x in reversed(range(past_days))]
+    return [date.strftime("%Y-%m-%d") for date in date_list]
+
+
 def read_json(json_path: str) -> list:
     """Load json and return list
 
