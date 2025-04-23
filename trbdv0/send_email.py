@@ -7,7 +7,7 @@ from typing import List
 import os
 import pandas as pd
 import numpy as np
-from utils import get_yesterdays_date
+from utils import get_todays_date, get_yesterdays_date
 
 
 class EmailSender:
@@ -72,8 +72,6 @@ def generate_subject_line(all_patient_stats: list) -> str:
     Returns:
         str: Subject line
     """
-    yesterday = get_yesterdays_date()
-
     needs_attention = []
     all_clear = []
 
@@ -93,10 +91,10 @@ def generate_subject_line(all_patient_stats: list) -> str:
 
     if not needs_attention:
         patients_str = ", ".join(sorted(all_clear))
-        return f"{study_name} [All Clear] for Patients: {patients_str} on {yesterday}"
+        return f"{study_name} [All Clear] for Patients: {patients_str}"
 
     flagged_str = ", ".join(sorted(needs_attention))
-    return f"{study_name} [Warning: {flagged_str} need review] on {yesterday}"
+    return f"{study_name} [Warning: {flagged_str} need review]"
 
 
 def generate_email_body(all_patient_stats: list) -> str:
@@ -163,12 +161,16 @@ def generate_email_body(all_patient_stats: list) -> str:
 
     df = pd.DataFrame(df_rows)
     html_table = df.to_html(index=False, escape=False)
+    yesterday = get_yesterdays_date()
+    today = get_todays_date()
 
     note = (
-        "<p style='font-size: 0.9em; color: #555;'>"
-        "<strong>Note:</strong> Cells highlighted in red indicate "
-        "either <em>missing data</em> or sleep < 5 hours, or values that deviate more than ±25% from the patient's average."
-        "</p>"
+        f"<p style='font-size: 0.9em; color: #555;'>"
+        f"<strong>Note:</strong> Cells highlighted in red indicate "
+        f"either <em>missing data</em>, sleep less than 5 hours, or values that deviate more than ±25% from the patient's average.<br>"
+        f"<strong>Yesterday</strong> is defined as the 24-hour period from "
+        f"<em>12:00 PM on {yesterday}</em> to <em>12:00 PM on {today}</em>."
+        f"</p>"
     )
 
     return html_table + note
