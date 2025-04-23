@@ -5,7 +5,11 @@ import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from utils import get_yesterdays_date, get_todays_date
+from utils import (
+    get_yesterdays_date,
+    get_todays_date,
+    get_iter_dates,
+)
 from datetime import datetime
 import numpy as np
 import os
@@ -22,23 +26,26 @@ class Master:
         self.plot_save_path = os.path.join(
             self.sleep.patient_out_dir, f"{self.patient}.png"
         )
-        # e.g. 2025-04-01
-        self.start_date = self.sleep.get_start_date()
-        self.end_date = self.sleep.get_end_date()
         self.patient = self.sleep.get_patient()
         self.timegrid = self.build_time_grid()
         self.master_integrated_time = self.build_master_integrated_time()
 
-    def build_time_grid(self) -> pd.DataFrame:
+    def build_time_grid(self, offset: int = 12) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
-        with timestamps localized to the given timezone (e.g., America/Chicago)."""
+        with timestamps localized to the given timezone (e.g., America/Chicago).
+
+        Suppose the time when the program run is 2025-04-23, the date range it will build will
+        be from 2025-04-10 12pm to 2025-04-23 12pm
+        """
 
         tz = pytz.timezone(self.timezone)
 
-        start_ts = pd.to_datetime(self.start_date).replace(hour=0, minute=0, second=0)
-        end_ts = pd.to_datetime(self.end_date).replace(
-            hour=0, minute=0, second=0
-        ) + pd.Timedelta(days=1)
+        today_date = get_todays_date(self.timezone)
+        date_range = get_iter_dates(today_date, self.sleep.num_past_days)
+        start_date, end_date = date_range[0], date_range[-1]
+
+        start_ts = pd.to_datetime(start_date).replace(hour=offset, minute=0, second=0)
+        end_ts = pd.to_datetime(end_date).replace(hour=offset, minute=0, second=0)
 
         # Localize start and end to the specified timezone
         start_ts = tz.localize(start_ts)
@@ -240,7 +247,7 @@ class Master:
 
         return pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
-    def build_master_integrated_time(self) -> pd.DataFrame:
+    def build_master_integrated_time(self, offset: int = 12) -> pd.DataFrame:
         """Builds a unified 1-minute resolution timeline combining sleep, activity, and MET data.
 
         Returns:
@@ -253,7 +260,7 @@ class Master:
                 - met: float MET value if available
         """
         # Base timeline
-        df = self.build_time_grid().copy()
+        df = self.timegrid.copy()
 
         # Sleep bedtimes
         df_in_bed = self.build_master_sleep_bedtimes()
@@ -293,6 +300,15 @@ class Master:
         # 9. Add day field
         df["day"] = df["timestamp"].dt.date
 
+        # define shifted_day such that 2025-04-10 12pm to 2025-04-11 12pm is 2025-04-10
+        # anything that falls before 12pm is considered the previous day
+        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        # define shifted_hour such at 12pm is 0, 1pm is 1, 2pm is 2, etc.
+        # with % because 3am is 15, 4am is 16, etc.
+        df["shifted_hour"] = (
+            df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0 - offset
+        ) % 24
+
         if "phase" in df.columns:
             df.rename(columns={"phase": "sleep_phase"}, inplace=True)
         if "phase_label" in df.columns:
@@ -331,9 +347,7 @@ class Master:
             return
 
         df = df.copy()
-        # hour as float, since we are plotting on hours
-        df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0
-        days = sorted(df["day"].unique())
+        days = sorted(df["shifted_day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 
         height = max(6, len(days) * 0.4)
@@ -343,7 +357,7 @@ class Master:
             fig = ax.figure
 
         for day in days:
-            day_df = df[(df["day"] == day) & (df["in_bed"] == True)].copy()
+            day_df = df[(df["shifted_day"] == day) & (df["in_bed"] == True)].copy()
 
             if day_df.empty:
                 continue
@@ -370,8 +384,14 @@ class Master:
 
         # Final formatting
         ax.set_xlim(0, 24)
-        ax.set_xticks(range(0, 25, 2))
-        ax.set_xlabel(f"Hour of Day ({self.timezone})")
+        xticks = range(0, 25, 2)
+        xticklabels = [
+            f"{(12 + h) % 12 or 12} {'AM' if (12 + h) % 24 < 12 else 'PM'}"
+            for h in xticks
+        ]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
+        ax.set_xlabel(f"Hour of Day (starting at 12PM — {self.timezone})")
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
         ax.set_title(f"{title} — Patient {self.patient}")
@@ -417,19 +437,29 @@ class Master:
             return "awake"
         return "unidentified"
 
-    def get_segments(self, df: pd.DataFrame) -> list:
-        """Returns (start_hour, end_hour) segments where rows are contiguous by 1-minute timestamps."""
+    def get_segments(self, df: pd.DataFrame, offset: int = 12) -> list:
+        """
+        Returns (start_hour, end_hour) segments where rows are contiguous by 1-minute timestamps,
+        with optional hour offset for custom day alignment (e.g., 12pm-to-12pm = offset 12).
+
+        Args:
+            df (pd.DataFrame): DataFrame with 1-minute timestamps.
+            offset (int): Number of hours to offset the hour-of-day (default 12 for 12pm–12pm).
+
+        Returns:
+            list of (start_hour, end_hour) tuples in offset-adjusted hour-of-day space.
+        """
         segments = []
         current_start = None
         previous_hour = None
 
         for i, timestamp in enumerate(df["timestamp"]):
-            hour = timestamp.hour + timestamp.minute / 60.0
+            # Apply offset to wrap day around (e.g., 12pm → 0)
+            hour = (timestamp.hour + timestamp.minute / 60.0 - offset) % 24
 
             if current_start is None:
                 current_start = hour
             elif (timestamp - df["timestamp"].iloc[i - 1]).seconds > 60:
-                # There's a gap in continuity
                 segments.append((current_start, previous_hour + 1 / 60))
                 current_start = hour
 
@@ -450,8 +480,7 @@ class Master:
             return
 
         df = df.copy()
-        df["hour"] = df["timestamp"].dt.hour + df["timestamp"].dt.minute / 60.0
-        df = df.sort_values(["day", "hour"])
+        df = df.sort_values(["shifted_day", "shifted_hour"])
 
         non_worn_label = "non_worn/battery_dead"
 
@@ -486,7 +515,7 @@ class Master:
             "> 4.5": "#084594",  # darkest blue
         }
 
-        days = sorted(df["day"].unique())
+        days = sorted(df["shifted_day"].unique())
         day_to_y = {day: i for i, day in enumerate(days)}
 
         height = max(6, len(days) * 0.4)
@@ -496,7 +525,7 @@ class Master:
             fig = ax.figure
 
         for day in days:
-            day_df = df[df["day"] == day]
+            day_df = df[df["shifted_day"] == day]
             for bucket, bucket_df in day_df.groupby("met_bucket"):
                 segments = self.get_segments(bucket_df)
                 for start, end in segments:
@@ -514,8 +543,15 @@ class Master:
 
         # Formatting
         ax.set_xlim(0, 24)
-        ax.set_xticks(range(0, 25, 2))
-        ax.set_xlabel(f"Hour of Day ({self.timezone})")
+        xticks = range(0, 25, 2)
+        xticklabels = [
+            f"{(12 + h) % 12 or 12} {'AM' if (12 + h) % 24 < 12 else 'PM'}"
+            for h in xticks
+        ]
+
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
+        ax.set_xlabel(f"Hour of Day (starting at 12PM — {self.timezone})")
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
         ax.set_title(f"{title} — Patient {self.patient}")
@@ -611,7 +647,7 @@ class Master:
         sleep_df = df[df["state"].isin(sleep_states)]
 
         daily_sleep = (
-            sleep_df.groupby("day").size().rename("sleep_minutes").reset_index()
+            sleep_df.groupby("shifted_day").size().rename("sleep_minutes").reset_index()
         )
 
         daily_sleep["sleep_hours"] = daily_sleep["sleep_minutes"] / 60.0
@@ -640,7 +676,9 @@ class Master:
         df["state"] = df.apply(self.assign_state, axis=1)
 
         sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[(df["day"] == yesterday) & (df["state"].isin(sleep_states))]
+        sleep_df = df[
+            (df["shifted_day"] == yesterday) & (df["state"].isin(sleep_states))
+        ]
 
         if sleep_df.empty:
             return np.nan
@@ -650,7 +688,7 @@ class Master:
 
         return sleep_hours
 
-    def compute_average_steps(self) -> int:
+    def compute_average_steps(self, offset: int = 12) -> int:
         """
         Computes the average daily step count from self.activity.steps.
 
@@ -669,14 +707,15 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
+        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
         # Group by day and sum steps per day
-        daily_steps = df.groupby("day")["steps"].sum()
+        daily_steps = df.groupby("shifted_day")["steps"].sum()
         avg_steps = daily_steps.mean()
 
         return int(round(avg_steps))
 
-    def compute_yesterdays_steps(self) -> int:
+    def compute_yesterdays_steps(self, offset: int = 12) -> int:
         """
         Returns the total step count for yesterday based on self.timezone.
 
@@ -700,9 +739,10 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
+        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
         # Filter for yesterday's entries
-        df_yesterday = df[df["day"] == yesterday]
+        df_yesterday = df[df["shifted_day"] == yesterday]
 
         if df_yesterday.empty:
             return np.nan
@@ -750,7 +790,7 @@ class Master:
 
         df = df.copy()
 
-        df_yesterday = df[df["day"] == yesterday]
+        df_yesterday = df[df["shifted_day"] == yesterday]
 
         if df_yesterday.empty:
             return np.nan
@@ -777,7 +817,7 @@ class Master:
                 res.append(date)
         return res
 
-    def get_yesterday_non_wear_time(self) -> int:
+    def get_yesterday_non_wear_time(self, offset: int = 12) -> int:
         """
         Returns the total non-wear time for yesterday in seconds.
 
@@ -799,8 +839,9 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
+        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
-        df_yesterday = df[df["day"] == yesterday]
+        df_yesterday = df[df["shifted_day"] == yesterday]
 
         if df_yesterday.empty:
             return np.nan

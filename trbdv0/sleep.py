@@ -51,8 +51,6 @@ class Sleep:
         self.filled_splitted_bedtimes_df = self.fill_missing_dates(
             self.splitted_bedtimes_df
         )
-        self.plot_bedtime_schedule(self.filled_splitted_bedtimes_df)
-        print()
 
     def get_start_date(self):
         return self.start_date
@@ -75,7 +73,7 @@ class Sleep:
     def ingest(self):
         """Ingests sleep data for a range of past dates.
 
-        For each date in `self.past_dates`, this function attempts to read a corresponding
+        For each date in `self.iter_past_dates`, this function attempts to read a corresponding
         `sleep.json` file from `self.patient_in_dir`. If the file does not exist, the date is skipped.
         If the file exists but has missing fields, those fields are filled with default values (e.g., NaN).
 
