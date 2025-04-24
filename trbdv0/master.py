@@ -633,14 +633,13 @@ class Master:
         Returns:
             float: Average sleep duration in hours per day.
         """
-        df = self.master_integrated_time
+        df = self.master_integrated_time.copy()
         if df.empty or "in_bed" not in df.columns:
             self.logger.error(
                 "compute_average_sleep_hours error: No sleep data available."
             )
             return np.nan
 
-        df = df.copy()
         df["state"] = df.apply(self.assign_state, axis=1)
 
         sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
@@ -802,20 +801,33 @@ class Master:
 
         return valid_met.mean()
 
-    def get_missing_sleep_dates(self) -> list:
-        """Return a list of missing dates in the dates list
+    def get_nan_sleep_dates(self) -> list:
+        """
+        Loop through each shifted_day and return those with NaN total sleep hours.
 
         Returns:
-            list: ["2023-06-23", "2023-06-24"]
+            list of strings: e.g. ["2025-04-23", "2025-04-24"]
         """
-        res = []
-        for date in self.sleep.get_past_dates():
-            patient_date_json = os.path.join(
-                self.sleep.patient_in_dir, date, "sleep.json"
-            )
-            if not os.path.exists(patient_date_json):
-                res.append(date)
-        return res
+        df = self.master_integrated_time.copy()
+        if df.empty or "in_bed" not in df.columns:
+            self.logger.error("get_nan_sleep_dates error: No sleep data available.")
+            return []
+
+        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+
+        nan_days = []
+        for day in df["shifted_day"].unique():
+            day_df = df[df["shifted_day"] == day].copy()
+            day_df["state"] = day_df.apply(self.assign_state, axis=1)
+            sleep_minutes = day_df[day_df["state"].isin(sleep_states)]
+            if sleep_minutes.empty:
+                nan_days.append(str(day))
+
+        return sorted(nan_days)
+
+    def get_total_days(self) -> int:
+        df = self.master_integrated_time.copy()
+        return len(df["shifted_day"].unique())
 
     def get_yesterday_non_wear_time(self, offset: int = 12) -> int:
         """
@@ -867,9 +879,9 @@ class Master:
             "yesterday_steps": self.compute_yesterdays_steps(),
             "average_met": self.compute_average_met(),
             "yesterday_met": self.compute_yesterdays_met(),
-            "missing_sleep_dates": self.get_missing_sleep_dates(),
-            "number_of_noncompliance_days": len(self.get_missing_sleep_dates()),
-            "number_of_days": len(self.sleep.get_past_dates()),
+            "missing_sleep_dates": self.get_nan_sleep_dates(),
+            "number_of_nansleep_days": len(self.get_nan_sleep_dates()),
+            "number_of_days": self.get_total_days(),
         }
 
     def generate_warning_flags(self, summary: dict) -> dict:
@@ -888,7 +900,7 @@ class Master:
         avg_steps = summary.get("average_steps")
         y_met = summary.get("yesterday_met")
         avg_met = summary.get("average_met")
-        non_compliance_days = summary.get("number_of_noncompliance_days")
+        nan_sleep_days = summary.get("number_of_nansleep_days")
         y_non_wear_time = summary.get("yesterday_non_wear_time_s")
 
         return {
@@ -898,7 +910,7 @@ class Master:
             "average_sleep_nan": pd.isna(avg_sleep),
             "average_steps_nan": pd.isna(avg_steps),
             "average_met_nan": pd.isna(avg_met),
-            "has_noncompliance_days": non_compliance_days > 0,
+            "has_nansleep_days": nan_sleep_days > 0,
             "yesterday_sleep_less_than_6": y_sleep < 6,
             "yesterday_non_wear_time_over_8": y_non_wear_time > 8 * 3600,
             "sleep_variation": (
