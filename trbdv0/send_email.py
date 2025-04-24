@@ -123,9 +123,9 @@ def generate_email_body(all_patient_stats: list) -> str:
 
         row = {
             "Patient": patient,
-            "Missing Days": style(
-                f"{summary['number_of_noncompliance_days']}/{summary['number_of_days']}",
-                "has_noncompliance_days",
+            "Missing Sleep Days": style(
+                f"{summary['number_of_nansleep_days']}/{summary['number_of_days']}",
+                "has_nansleep_days",
             ),
             "Average Sleep (h)": style(
                 f"{summary.get('average_sleep_hours', np.nan):.1f}",

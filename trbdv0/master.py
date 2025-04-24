@@ -41,7 +41,9 @@ class Master:
         tz = pytz.timezone(self.timezone)
 
         today_date = get_todays_date(self.timezone)
-        date_range = get_iter_dates(today_date, self.sleep.num_past_days)
+        # we need to get self.num_past_days + 1 days so that
+        # we actually have self.num_past_days intervals
+        date_range = get_iter_dates(today_date, self.sleep.num_past_days + 1)
         start_date, end_date = date_range[0], date_range[-1]
 
         start_ts = pd.to_datetime(start_date).replace(hour=offset, minute=0, second=0)
