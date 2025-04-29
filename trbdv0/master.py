@@ -394,6 +394,7 @@ class Master:
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)
         ax.set_xlabel(f"Hour of Day (starting at 12PM — {self.timezone})")
+        ax.tick_params("x", labelbottom=True)
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
         ax.set_title(f"{title} — Patient {self.patient}")
