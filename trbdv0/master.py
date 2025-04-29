@@ -34,16 +34,18 @@ class Master:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
         with timestamps localized to the given timezone (e.g., America/Chicago).
 
-        Suppose the time when the program run is 2025-04-23, the date range it will build will
-        be from 2025-04-10 12pm to 2025-04-23 12pm
+        Definition updated on 2025-04-29, we define the date range to be up to yesterday 12pm at the
+        time of running the program.
+            - if the program is run on 2025-04-29, the date range will be
+            - from 2025-04-14 12pm to 2025-04-28 12pm (America/Chicago)
+            - aka we will not include the actual yesterday's data from 2025-04-28 12pm to 2025-04-29 12pm
         """
-
         tz = pytz.timezone(self.timezone)
 
-        today_date = get_todays_date(self.timezone)
+        yesterday_date = get_yesterdays_date(self.timezone)
         # we need to get self.num_past_days + 1 days so that
         # we actually have self.num_past_days intervals
-        date_range = get_iter_dates(today_date, self.sleep.num_past_days + 1)
+        date_range = get_iter_dates(yesterday_date, self.sleep.num_past_days + 1)
         start_date, end_date = date_range[0], date_range[-1]
 
         start_ts = pd.to_datetime(start_date).replace(hour=offset, minute=0, second=0)

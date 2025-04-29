@@ -69,6 +69,22 @@ def get_yesterdays_date(timezone="America/Chicago") -> str:
     return yesterday_local.strftime("%Y-%m-%d")
 
 
+def get_day_before_yesterday(timezone="America/Chicago") -> str:
+    """
+    Get the date of the day before yesterday in the specified timezone.
+
+    Args:
+        timezone (str): IANA timezone string, e.g. "America/Chicago"
+
+    Returns:
+        str: Date string in "YYYY-MM-DD" format, e.g. "2024-04-29"
+    """
+    tz = pytz.timezone(timezone)
+    now_local = datetime.now(tz)
+    day_before_yesterday_local = now_local - timedelta(days=2)
+    return day_before_yesterday_local.strftime("%Y-%m-%d")
+
+
 def get_past_dates(end_date: str, past_days: int = 7) -> list:
     """Get a sorted list of past dates before the given end_date.
 
