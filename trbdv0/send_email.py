@@ -7,7 +7,7 @@ from typing import List
 import os
 import pandas as pd
 import numpy as np
-from utils import get_todays_date, get_yesterdays_date
+from trbdv0.utils import get_todays_date, get_yesterdays_date
 
 
 class EmailSender:

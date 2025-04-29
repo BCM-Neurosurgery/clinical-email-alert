@@ -1,11 +1,11 @@
 import pandas as pd
-from sleep import Sleep
-from activity import Activity
+from trbdv0.sleep import Sleep
+from trbdv0.activity import Activity
 import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from utils import (
+from trbdv0.utils import (
     get_yesterdays_date,
     get_todays_date,
     get_iter_dates,

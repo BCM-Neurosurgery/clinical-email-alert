@@ -6,10 +6,10 @@ Usage
 - python main.py
 """
 
-from sleep import Sleep
-from activity import Activity
-from master import Master
-from utils import (
+from trbdv0.sleep import Sleep
+from trbdv0.activity import Activity
+from trbdv0.master import Master
+from trbdv0.utils import (
     get_todays_date,
     read_config,
     validate_config_keys,
@@ -17,21 +17,28 @@ from utils import (
 import os
 import logging
 import pytz
-from logger_setup import setup_logger
+from trbdv0.logger_setup import setup_logger
 from datetime import datetime
-from send_email import (
+from trbdv0.send_email import (
     EmailSender,
     generate_subject_line,
     generate_email_body,
     get_attachments,
 )
-from survey_automation import send_survey, send_wearable_reminder
+from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import json
 
 
-def main(config_file):
-    config = read_config(config_file)
+def main():
+    # parse command line arguments
+    parser = argparse.ArgumentParser(description="Run the notification system.")
+    parser.add_argument(
+        "--config", type=str, default="config.json", help="Path to the config file"
+    )
+    args = parser.parse_args()
+
+    config = read_config(args.config)
 
     # verify keys
     try:
@@ -142,10 +149,4 @@ def main(config_file):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the notification system.")
-    parser.add_argument(
-        "--config", type=str, default="config.json", help="Path to the config file"
-    )
-    args = parser.parse_args()
-
-    main(args.config)
+    main()

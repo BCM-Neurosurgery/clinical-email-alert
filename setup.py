@@ -26,12 +26,12 @@ setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "your_command=your_package.module:main_function",
+            "send-email=trbdv0.main:main",
         ],
     },
     include_package_data=True,
     package_data={
         "": ["*.txt", "*.md"],
-        "your_package": ["data/*.dat"],
+        "trbdv0": ["data/*.dat"],
     },
 )
