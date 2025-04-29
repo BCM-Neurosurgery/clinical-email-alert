@@ -25,6 +25,7 @@ from trbdv0.send_email import (
     generate_email_body,
     get_attachments,
 )
+from trbdv0.constants import *
 from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import json
@@ -105,18 +106,18 @@ def main():
         warnings = master.generate_warning_flags(patient_summary_stats)
 
         # send quatrics survey if sleep_variation is triggered
-        if warnings["sleep_variation"] or warnings["yesterday_sleep_less_than_6"]:
+        if warnings[STEPS_VARIATION] or warnings[LASTDAY_SLEEP_LESS_THAN_6]:
             if patient in quatrics_sleep_reminder:
                 logger.info(
-                    f"sleep_variation or yesterday_sleep_less_than_6 triggered, sending survey to {patient}..."
+                    f"{STEPS_VARIATION} or {LASTDAY_SLEEP_LESS_THAN_6} triggered, sending survey to {patient}..."
                 )
                 send_survey(patient)
 
         # send quatrics survey if non_wear_time is triggered
-        if warnings["yesterday_non_wear_time_over_8"]:
+        if warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
             if patient in quatrics_nonwear_reminder:
                 logger.info(
-                    f"yesterday_non_wear_time_over_8 triggered, sending survey to {patient}..."
+                    f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
                 )
                 send_wearable_reminder(patient)
 

@@ -9,7 +9,9 @@ from trbdv0.utils import (
     get_yesterdays_date,
     get_todays_date,
     get_iter_dates,
+    get_last_day,
 )
+from trbdv0.constants import *
 from datetime import datetime
 import numpy as np
 import os
@@ -659,30 +661,27 @@ class Master:
 
         return avg_sleep_hours
 
-    def compute_yesterday_sleep_hours(self) -> float:
+    def compute_lastday_sleep_hours(self) -> float:
         """
-        Computes total sleep duration (in hours) for 'yesterday' in self.timezone.
+        Computes total sleep duration (in hours) for last day in self.timezone.
+        Last day could be yesterday or day before yesterday
 
         Sleep includes deep, light, and REM phases. Excludes non-wear, awake, unidentified.
 
         Returns:
-            float: Total sleep hours for yesterday.
+            float: Total sleep hours for last day.
         """
         df = self.master_integrated_time
         if df.empty or "in_bed" not in df.columns:
             return np.nan
 
-        yesterday = datetime.strptime(
-            get_yesterdays_date(self.timezone), "%Y-%m-%d"
-        ).date()
+        lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
         df = df.copy()
         df["state"] = df.apply(self.assign_state, axis=1)
 
         sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[
-            (df["shifted_day"] == yesterday) & (df["state"].isin(sleep_states))
-        ]
+        sleep_df = df[(df["shifted_day"] == lastday) & (df["state"].isin(sleep_states))]
 
         if sleep_df.empty:
             return np.nan
@@ -719,19 +718,17 @@ class Master:
 
         return int(round(avg_steps))
 
-    def compute_yesterdays_steps(self, offset: int = 12) -> int:
+    def compute_lastday_steps(self, offset: int = 12) -> int:
         """
-        Returns the total step count for yesterday based on self.timezone.
+        Returns the total step count for last day based on self.timezone.
 
         Returns:
-            int: Total number of steps yesterday, or np.nan if no data.
+            int: Total number of steps last day, or np.nan if no data.
         """
         if not self.activity.steps:
             return np.nan
 
-        yesterday = datetime.strptime(
-            get_yesterdays_date(self.timezone), "%Y-%m-%d"
-        ).date()
+        lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
         # Convert to DataFrame
         df = pd.DataFrame(self.activity.steps)
@@ -745,14 +742,12 @@ class Master:
         df["day"] = df["timestamp"].dt.date
         df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
-        # Filter for yesterday's entries
-        df_yesterday = df[df["shifted_day"] == yesterday]
+        df_lastday = df[df["shifted_day"] == lastday]
 
-        if df_yesterday.empty:
+        if df_lastday.empty:
             return np.nan
 
-        # Sum steps for yesterday
-        return int(df_yesterday["steps"].sum())
+        return int(df_lastday["steps"].sum())
 
     def compute_average_met(self) -> float:
         """
@@ -773,9 +768,9 @@ class Master:
 
         return valid_met.mean()
 
-    def compute_yesterdays_met(self) -> float:
+    def compute_lastday_met(self) -> float:
         """
-        Computes the average MET for yesterday based on self.timezone.
+        Computes the average MET for last day based on self.timezone.
 
         Ignores NaN MET values. Includes all other MET values, even ≤ 0.1.
 
@@ -788,18 +783,16 @@ class Master:
             self.logger.error("compute_yesterdays_met error: No MET data available.")
             return np.nan
 
-        yesterday = datetime.strptime(
-            get_yesterdays_date(self.timezone), "%Y-%m-%d"
-        ).date()
+        lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
         df = df.copy()
 
-        df_yesterday = df[df["shifted_day"] == yesterday]
+        df_lastday = df[df["shifted_day"] == lastday]
 
-        if df_yesterday.empty:
+        if df_lastday.empty:
             return np.nan
 
-        valid_met = df_yesterday["met"].dropna()
+        valid_met = df_lastday["met"].dropna()
 
         if valid_met.empty:
             return np.nan
@@ -834,9 +827,10 @@ class Master:
         df = self.master_integrated_time.copy()
         return len(df["shifted_day"].unique())
 
-    def get_yesterday_non_wear_time(self, offset: int = 12) -> int:
+    def get_last_non_wear_time(self, offset: int = 12) -> int:
         """
-        Returns the total non-wear time for yesterday in seconds.
+        Returns the total non-wear time for last day in seconds.
+        Last day could be yesterday or day before yesterday.
 
         Returns:
             int: Total non-wear time in seconds, or np.nan if no data.
@@ -844,9 +838,7 @@ class Master:
         if not self.activity.nonweartime:
             return np.nan
 
-        yesterday = datetime.strptime(
-            get_yesterdays_date(self.timezone), "%Y-%m-%d"
-        ).date()
+        lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
         df = pd.DataFrame(self.activity.nonweartime)
 
@@ -858,12 +850,12 @@ class Master:
         df["day"] = df["timestamp"].dt.date
         df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
-        df_yesterday = df[df["shifted_day"] == yesterday]
+        df_lastday = df[df["shifted_day"] == lastday]
 
-        if df_yesterday.empty:
+        if df_lastday.empty:
             return np.nan
 
-        return int(df_yesterday["non_wear_time"].sum())
+        return int(df_lastday["non_wear_time"].sum())
 
     def get_summary_stats(self) -> dict:
         """
@@ -873,20 +865,20 @@ class Master:
             dict: Summary stats with float or np.nan values
         """
         return {
-            "patient": self.patient,
-            "study_name": self.study_name,
-            "todays_date": get_todays_date(),
-            "yesterdays_date": get_yesterdays_date(),
-            "average_sleep_hours": self.compute_average_sleep_hours(),
-            "yesterday_sleep_hours": self.compute_yesterday_sleep_hours(),
-            "yesterday_non_wear_time_s": self.get_yesterday_non_wear_time(),
-            "average_steps": self.compute_average_steps(),
-            "yesterday_steps": self.compute_yesterdays_steps(),
-            "average_met": self.compute_average_met(),
-            "yesterday_met": self.compute_yesterdays_met(),
-            "missing_sleep_dates": self.get_nan_sleep_dates(),
-            "number_of_nansleep_days": len(self.get_nan_sleep_dates()),
-            "number_of_days": self.get_total_days(),
+            PATIENT: self.patient,
+            STUDY_NAME: self.study_name,
+            TODAYS_DATE: get_todays_date(),
+            LASTDAY_DATE: get_last_day(),
+            AVERAGE_SLEEP_HOURS: self.compute_average_sleep_hours(),
+            LASTDAY_SLEEP_HOURS: self.compute_lastday_sleep_hours(),
+            LASTDAY_NON_WEAR_TIME_S: self.get_last_non_wear_time(),
+            AVERAGE_STEPS: self.compute_average_steps(),
+            LASTDAY_STEPS: self.compute_lastday_steps(),
+            AVERAGE_MET: self.compute_average_met(),
+            LASTDAY_MET: self.compute_lastday_met(),
+            MISSING_SLEEP_DATES: self.get_nan_sleep_dates(),
+            NUMBER_OF_NANSLEEP_DAYS: len(self.get_nan_sleep_dates()),
+            NUMBER_OF_DAYS: self.get_total_days(),
         }
 
     def generate_warning_flags(self, summary: dict) -> dict:
@@ -899,41 +891,41 @@ class Master:
         Returns:
             dict: Dictionary of warning flags with boolean values
         """
-        y_sleep = summary.get("yesterday_sleep_hours")
-        avg_sleep = summary.get("average_sleep_hours")
-        y_steps = summary.get("yesterday_steps")
-        avg_steps = summary.get("average_steps")
-        y_met = summary.get("yesterday_met")
-        avg_met = summary.get("average_met")
-        nan_sleep_days = summary.get("number_of_nansleep_days")
-        y_non_wear_time = summary.get("yesterday_non_wear_time_s")
+        l_sleep = summary.get(LASTDAY_SLEEP_HOURS)
+        avg_sleep = summary.get(AVERAGE_SLEEP_HOURS)
+        l_steps = summary.get(LASTDAY_STEPS)
+        avg_steps = summary.get(AVERAGE_STEPS)
+        l_met = summary.get(LASTDAY_MET)
+        avg_met = summary.get(AVERAGE_MET)
+        nan_sleep_days = summary.get(NUMBER_OF_NANSLEEP_DAYS)
+        l_non_wear_time = summary.get(LASTDAY_NON_WEAR_TIME_S)
 
         return {
-            "yesterday_sleep_nan": pd.isna(y_sleep),
-            "yesterday_steps_nan": pd.isna(y_steps),
-            "yesterday_met_nan": pd.isna(y_met),
-            "average_sleep_nan": pd.isna(avg_sleep),
-            "average_steps_nan": pd.isna(avg_steps),
-            "average_met_nan": pd.isna(avg_met),
-            "has_nansleep_days": nan_sleep_days > 0,
-            "yesterday_sleep_less_than_6": y_sleep < 6,
-            "yesterday_non_wear_time_over_8": y_non_wear_time > 8 * 3600,
-            "sleep_variation": (
-                not pd.isna(y_sleep)
+            LASTDAY_SLEEP_NAN: pd.isna(l_sleep),
+            LASTDAY_STEPS_NAN: pd.isna(l_steps),
+            LASTDAY_MET_NAN: pd.isna(l_met),
+            AVERAGE_SLEEP_NAN: pd.isna(avg_sleep),
+            AVERAGE_STEPS_NAN: pd.isna(avg_steps),
+            AVERAGE_MET_NAN: pd.isna(avg_met),
+            HAS_NAN_SLEEP_DAYS: nan_sleep_days > 0,
+            LASTDAY_SLEEP_LESS_THAN_6: l_sleep < 6,
+            LASTDAY_NON_WEAR_TIME_OVER_8: l_non_wear_time > 8 * 3600,
+            SLEEP_VARIATION: (
+                not pd.isna(l_sleep)
                 and not pd.isna(avg_sleep)
                 and avg_sleep > 0
-                and (y_sleep < 0.75 * avg_sleep or y_sleep > 1.25 * avg_sleep)
+                and (l_sleep < 0.75 * avg_sleep or l_sleep > 1.25 * avg_sleep)
             ),
-            "steps_variation": (
-                not pd.isna(y_steps)
+            STEPS_VARIATION: (
+                not pd.isna(l_steps)
                 and not pd.isna(avg_steps)
                 and avg_steps > 0
-                and (y_steps < 0.75 * avg_steps or y_steps > 1.25 * avg_steps)
+                and (l_steps < 0.75 * avg_steps or l_steps > 1.25 * avg_steps)
             ),
-            "met_variation": (
-                not pd.isna(y_met)
+            MET_VARIATION: (
+                not pd.isna(l_met)
                 and not pd.isna(avg_met)
                 and avg_met > 0
-                and (y_met < 0.75 * avg_met or y_met > 1.25 * avg_met)
+                and (l_met < 0.75 * avg_met or l_met > 1.25 * avg_met)
             ),
         }

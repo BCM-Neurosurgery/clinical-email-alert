@@ -69,7 +69,7 @@ def get_yesterdays_date(timezone="America/Chicago") -> str:
     return yesterday_local.strftime("%Y-%m-%d")
 
 
-def get_day_before_yesterday(timezone="America/Chicago") -> str:
+def get_last_day(timezone="America/Chicago") -> str:
     """
     Get the date of the day before yesterday in the specified timezone.
 

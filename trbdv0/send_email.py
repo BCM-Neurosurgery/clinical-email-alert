@@ -7,7 +7,12 @@ from typing import List
 import os
 import pandas as pd
 import numpy as np
-from trbdv0.utils import get_todays_date, get_yesterdays_date
+from trbdv0.utils import (
+    get_todays_date,
+    get_yesterdays_date,
+    get_last_day,
+)
+from trbdv0.constants import *
 
 
 class EmailSender:
@@ -122,38 +127,34 @@ def generate_email_body(all_patient_stats: list) -> str:
             return val
 
         row = {
-            "Patient": patient,
-            "Missing Sleep Days": style(
-                f"{summary['number_of_nansleep_days']}/{summary['number_of_days']}",
-                "has_nansleep_days",
+            PT_COLUMN: patient,
+            LASTDAY_SLEEP_COLUMN: style(
+                f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
+                LASTDAY_SLEEP_NAN,
+                LASTDAY_SLEEP_LESS_THAN_6,
+                SLEEP_VARIATION,
             ),
-            "Average Sleep (h)": style(
-                f"{summary.get('average_sleep_hours', np.nan):.1f}",
-                "average_sleep_nan",
+            AVERAGE_SLEEP_COLUMN: style(
+                f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
+                AVERAGE_SLEEP_NAN,
             ),
-            "Yesterday's Sleep (h)": style(
-                f"{summary.get('yesterday_sleep_hours', np.nan):.1f}",
-                "sleep_variation",
-                "yesterday_sleep_nan",
-                "yesterday_sleep_less_than_6",
+            LASTDAY_STEPS_COLUMN: style(
+                f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
+                LASTDAY_STEPS_NAN,
+                STEPS_VARIATION,
             ),
-            "Average Steps": style(
-                f"{summary.get('average_steps', np.nan):.0f}",
-                "average_steps_nan",
+            AVERAGE_STEPS_COLUMN: style(
+                f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
+                AVERAGE_STEPS_NAN,
             ),
-            "Yesterday's Steps": style(
-                f"{summary.get('yesterday_steps', np.nan):.0f}",
-                "steps_variation",
-                "yesterday_steps_nan",
+            LASTDAY_MET_COLUMN: style(
+                f"{summary.get(LASTDAY_MET, np.nan):.2f}",
+                LASTDAY_MET_NAN,
+                MET_VARIATION,
             ),
-            "Average MET": style(
-                f"{summary.get('average_met', np.nan):.2f}",
-                "average_met_nan",
-            ),
-            "Yesterday's MET": style(
-                f"{summary.get('yesterday_met', np.nan):.2f}",
-                "met_variation",
-                "yesterday_met_nan",
+            AVERAGE_MET_COLUMN: style(
+                f"{summary.get(AVERAGE_MET, np.nan):.2f}",
+                AVERAGE_MET_NAN,
             ),
         }
 
@@ -161,15 +162,15 @@ def generate_email_body(all_patient_stats: list) -> str:
 
     df = pd.DataFrame(df_rows)
     html_table = df.to_html(index=False, escape=False)
+    lastday = get_last_day()
     yesterday = get_yesterdays_date()
-    today = get_todays_date()
 
     note = (
         f"<p style='font-size: 0.9em; color: #555;'>"
         f"<strong>Note:</strong> Cells highlighted in red indicate "
-        f"either <em>missing data</em>, sleep less than 5 hours, or values that deviate more than ±25% from the patient's average.<br>"
-        f"<strong>Yesterday</strong> is defined as the 24-hour period from "
-        f"<em>12:00 PM on {yesterday}</em> to <em>12:00 PM on {today}</em>."
+        f"either <em>missing data</em>, sleep less than 6 hours, or values that deviate more than ±25% from the patient's average.<br>"
+        f"<strong>Last Day</strong> is defined as the 24-hour period from "
+        f"<em>12:00 PM on {lastday}</em> to <em>12:00 PM on {yesterday}</em>."
         f"</p>"
     )
 
