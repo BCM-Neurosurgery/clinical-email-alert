@@ -88,13 +88,36 @@ class Activity:
                 continue
 
             for activity_entry in activity_data:
+                class_5_min = activity_entry.get("class_5_min", np.nan)
+                met = activity_entry.get("met", None)
+
+                if met and class_5_min:
+                    # if duration of met != duration of class_5_min
+                    met_items_duration = len(met.get("items", []))
+                    class_5_min_duration = len(class_5_min) * 5
+                    if met_items_duration != class_5_min_duration:
+                        print(
+                            f"Warning: MET items length {met_items_duration} does not match class_5_min * 5 length {class_5_min_duration}."
+                        )
+                        valid_len_min = int(
+                            len(class_5_min) * (5 * 60) / met.get("interval", 60.0)
+                        )
+
+                        # Trim met["items"]
+                        # because sometimes met["items"]
+                        # get auto-filled with 0.9s even the
+                        # ring is not worn
+                        met_items = met.get("items", [])
+                        met["items"] = met_items[:valid_len_min]
+
                 entry = {
-                    "class_5_min": activity_entry.get("class_5_min", np.nan),
+                    "class_5_min": class_5_min,
                     "non_wear_time": activity_entry.get("non_wear_time", np.nan),
                     "steps": activity_entry.get("steps", np.nan),
                     "timestamp": activity_entry.get("timestamp", np.nan),
-                    "met": activity_entry.get("met", None),
+                    "met": met,
                 }
+
                 self.activity_data.append(entry)
 
                 self.met.append(entry["met"])
