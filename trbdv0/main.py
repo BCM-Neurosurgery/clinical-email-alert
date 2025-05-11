@@ -106,10 +106,10 @@ def main():
         warnings = master.generate_warning_flags(patient_summary_stats)
 
         # send quatrics survey if sleep_variation is triggered
-        if warnings[STEPS_VARIATION] or warnings[LASTDAY_SLEEP_LESS_THAN_6]:
+        if warnings[SLEEP_VARIATION]:
             if patient in quatrics_sleep_reminder:
                 logger.info(
-                    f"{STEPS_VARIATION} or {LASTDAY_SLEEP_LESS_THAN_6} triggered, sending survey to {patient}..."
+                    f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
                 )
                 send_survey(patient)
 
