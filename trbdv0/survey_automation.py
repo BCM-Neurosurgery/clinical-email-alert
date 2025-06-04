@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json
 import requests
 
-with open("/home/settings/DBSPsych-56119/qualtrics-ema-config.json", "r") as file:
+with open("/home/settings/TRBD-53761/qualtrics-ema-config.json", "r") as file:
     config = json.load(file)
 
 """
@@ -32,11 +32,6 @@ def send_survey(patient_id, survey="ISS"):
     """
     Sends a specified patient a survey (ISS by default) or reminder over SMS and email immediately.
     """
-    if patient_id[0] == "T":
-        mailinglistid = mailinglist_id["TRBD"]
-    elif patient_id[0] == "D":
-        mailinglistid = mailinglist_id["OCD"]
-
     ### EMAIL SURVEY:
     # Define the API URL
     url = "https://iad1.qualtrics.com/API/v3/distributions"
@@ -51,7 +46,7 @@ def send_survey(patient_id, survey="ISS"):
             "messageText": messageText
         },
         "recipients": {
-            "mailingListId": mailinglistid,  # can specify a group/list or a single contact
+            "mailingListId": mailinglist_id,  # can specify a group/list or a single contact
             "contactId": patient_ids[patient_id],
         },
         "header": {
@@ -94,7 +89,7 @@ def send_survey(patient_id, survey="ISS"):
             "messageText": messageText  # add timestamp to message otherwise it filters out duplicates
         },
         "recipients": {
-            "mailingListId": mailinglistid,
+            "mailingListId": mailinglist_id,
             "contactId": patient_ids[patient_id],
         },
         "surveyId": survey_ids[survey],
@@ -114,11 +109,6 @@ def send_wearable_reminder(patient_id):
     """
     Sends a specified patient a reminder to wear their Oura Ring by email and SMS
     """
-    if patient_id[0] == "T":
-        mailinglistid = mailinglist_id["TRBD"]
-    else:
-        mailinglistid = mailinglist_id["OCD"]
-
     ### EMAIL SURVEY:
     # Define the API URL
     url = "https://iad1.qualtrics.com/API/v3/distributions"
@@ -136,7 +126,7 @@ def send_wearable_reminder(patient_id):
             + "), we hope you are doing well. We noticed a lack of Oura Ring data coming in, please fill out this survey if there is anything you would like to tell us: ${l://SurveyURL}"
         },
         "recipients": {
-            "mailingListId": mailinglistid,  # can specify a group/list or a single contact
+            "mailingListId": mailinglist_id,  # can specify a group/list or a single contact
             "contactId": patient_ids[patient_id],
         },
         "header": {
@@ -185,7 +175,7 @@ def send_wearable_reminder(patient_id):
             + "), we hope you are doing well. We noticed a lack of Oura Ring data coming in, please fill out this survey if there is anything we should know: ${l://SurveyURL}"  # add timestamp to message otherwise it filters out duplicates
         },
         "recipients": {
-            "mailingListId": mailinglistid,
+            "mailingListId": mailinglist_id,
             "contactId": patient_ids[patient_id],
         },
         "surveyId": survey_ids["Short_Response"],
