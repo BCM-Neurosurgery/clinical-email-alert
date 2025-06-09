@@ -58,11 +58,15 @@ def main():
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     timezone = config["timezone"]
+    quatrics_config_path = config["quatrics_config_path"]
     quatrics_sleep_reminder = config["quatrics_sleep_reminder"]
     quatrics_nonwear_reminder = config["quatrics_nonwear_reminder"]
     timestamp = datetime.now(pytz.timezone(timezone))
     timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
     today_date = get_todays_date()
+
+    # load quatrics config
+    quatrics_config = read_config(quatrics_config_path)
 
     # initialize email sender
     email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
@@ -111,7 +115,7 @@ def main():
                 logger.info(
                     f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
                 )
-                send_survey(patient)
+                send_survey(patient, quatrics_config)
 
         # send quatrics survey if non_wear_time is triggered
         if warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
@@ -119,7 +123,7 @@ def main():
                 logger.info(
                     f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
                 )
-                send_wearable_reminder(patient)
+                send_wearable_reminder(patient, quatrics_config)
 
         # save summary stats to file
         summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")

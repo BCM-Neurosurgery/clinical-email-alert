@@ -173,6 +173,7 @@ def validate_config_keys(config: dict) -> None:
         "smtp_password",
         "past_days",
         "active_patients",
+        "quatrics_config_path",
         "quatrics_sleep_reminder",
         "quatrics_nonwear_reminder",
         "study_name",
