@@ -3,24 +3,11 @@ Send a Qualtrics survey/message to a specified patient via email and/or SMS
 """
 
 from datetime import datetime, timezone
-import json
 import requests
-
-with open("/home/settings/TRBD-53761/qualtrics-ema-config.json", "r") as file:
-    config = json.load(file)
 
 """
 Requires json config file with API Token 'token', dict of patient lookup IDs 'patientid_dict', dict of survey IDs 'surveyid_dict', and a mailing list ID 'mailinglistid'.
 """
-
-token = config["token"]  # api token
-patient_ids = config["lookup_ids"]  # dict of patients and qualtrics IDs
-survey_ids = config["survey_ids"]  # dict of survey IDs
-mailinglist_id = config[
-    "mailinglist_id"
-]  # dict of mailing list IDs (need mailing list ID and contact ID)
-# message_ids = config['message_ids']
-
 messageText = (
     "From Baylor Research ("
     + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
@@ -28,10 +15,15 @@ messageText = (
 )
 
 
-def send_survey(patient_id, survey="ISS"):
+def send_survey(patient_id, quatrics_config: dict, survey="ISS"):
     """
     Sends a specified patient a survey (ISS by default) or reminder over SMS and email immediately.
     """
+    token = quatrics_config["token"]  # api token
+    patient_ids = quatrics_config["lookup_ids"]  # dict of patients and qualtrics IDs
+    survey_ids = quatrics_config["survey_ids"]  # dict of survey IDs
+    mailinglist_id = quatrics_config["mailinglist_id"]
+
     ### EMAIL SURVEY:
     # Define the API URL
     url = "https://iad1.qualtrics.com/API/v3/distributions"
@@ -105,10 +97,14 @@ def send_survey(patient_id, survey="ISS"):
     print("SMS response: ", response.json())
 
 
-def send_wearable_reminder(patient_id):
+def send_wearable_reminder(patient_id, quatrics_config: dict):
     """
     Sends a specified patient a reminder to wear their Oura Ring by email and SMS
     """
+    token = quatrics_config["token"]  # api token
+    patient_ids = quatrics_config["lookup_ids"]  # dict of patients and qualtrics IDs
+    survey_ids = quatrics_config["survey_ids"]  # dict of survey IDs
+    mailinglist_id = quatrics_config["mailinglist_id"]
     ### EMAIL SURVEY:
     # Define the API URL
     url = "https://iad1.qualtrics.com/API/v3/distributions"
