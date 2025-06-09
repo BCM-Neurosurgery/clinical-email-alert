@@ -902,10 +902,10 @@ class Master:
 
         return {
             LASTDAY_SLEEP_NAN: pd.isna(l_sleep),
-            LASTDAY_STEPS_NAN: pd.isna(l_steps),
+            # LASTDAY_STEPS_NAN: pd.isna(l_steps),
             LASTDAY_MET_NAN: pd.isna(l_met),
             AVERAGE_SLEEP_NAN: pd.isna(avg_sleep),
-            AVERAGE_STEPS_NAN: pd.isna(avg_steps),
+            # AVERAGE_STEPS_NAN: pd.isna(avg_steps),
             AVERAGE_MET_NAN: pd.isna(avg_met),
             HAS_NAN_SLEEP_DAYS: nan_sleep_days > 0,
             LASTDAY_SLEEP_LESS_THAN_6: l_sleep < 6,
@@ -916,12 +916,12 @@ class Master:
                 and avg_sleep > 0
                 and (l_sleep < 0.75 * avg_sleep or l_sleep > 1.25 * avg_sleep)
             ),
-            STEPS_VARIATION: (
-                not pd.isna(l_steps)
-                and not pd.isna(avg_steps)
-                and avg_steps > 0
-                and (l_steps < 0.75 * avg_steps or l_steps > 1.25 * avg_steps)
-            ),
+            # STEPS_VARIATION: (
+            #     not pd.isna(l_steps)
+            #     and not pd.isna(avg_steps)
+            #     and avg_steps > 0
+            #     and (l_steps < 0.75 * avg_steps or l_steps > 1.25 * avg_steps)
+            # ),
             MET_VARIATION: (
                 not pd.isna(l_met)
                 and not pd.isna(avg_met)

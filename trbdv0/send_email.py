@@ -140,12 +140,12 @@ def generate_email_body(all_patient_stats: list) -> str:
             ),
             LASTDAY_STEPS_COLUMN: style(
                 f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
-                LASTDAY_STEPS_NAN,
-                STEPS_VARIATION,
+                # LASTDAY_STEPS_NAN,
+                # STEPS_VARIATION,
             ),
             AVERAGE_STEPS_COLUMN: style(
                 f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
-                AVERAGE_STEPS_NAN,
+                # AVERAGE_STEPS_NAN,
             ),
             LASTDAY_MET_COLUMN: style(
                 f"{summary.get(LASTDAY_MET, np.nan):.2f}",
