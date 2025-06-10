@@ -906,7 +906,7 @@ class Master:
             AVERAGE_SLEEP_NAN: pd.isna(avg_sleep),
             # AVERAGE_STEPS_NAN: pd.isna(avg_steps),
             AVERAGE_MET_NAN: pd.isna(avg_met),
-            HAS_NAN_SLEEP_DAYS: nan_sleep_days > 0,
+            # HAS_NAN_SLEEP_DAYS: nan_sleep_days > 0,
             LASTDAY_SLEEP_LESS_THAN_6: l_sleep < 6,
             LASTDAY_NON_WEAR_TIME_OVER_8: l_non_wear_time > 8 * 3600,
             SLEEP_VARIATION: (
