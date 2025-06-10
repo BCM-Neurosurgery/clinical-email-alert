@@ -709,7 +709,6 @@ class Master:
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
-        df["day"] = df["timestamp"].dt.date
         df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
 
         # Group by day and sum steps per day

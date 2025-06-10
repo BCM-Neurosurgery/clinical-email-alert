@@ -40,11 +40,11 @@ LASTDAY_NON_WEAR_TIME_OVER_8 = "lastday_non_wear_time_over_8"
 PT_COLUMN = "Patient"
 MISSING_LASTDAY_SLEEP_COLUMN = "Missing Last Day Sleep"
 
-LASTDAY_SLEEP_COLUMN = "Last Day Sleep (h)"
+LASTDAY_SLEEP_COLUMN = "Sleep (12pm-12pm, Day-2 to Yesterday)"
 AVERAGE_SLEEP_COLUMN = "Average Sleep (h)"
 
-LASTDAY_STEPS_COLUMN = "Last Day Steps"
+LASTDAY_STEPS_COLUMN = "Yesterday Steps"
 AVERAGE_STEPS_COLUMN = "Average Steps"
 
-LASTDAY_MET_COLUMN = "Last Day MET"
+LASTDAY_MET_COLUMN = "Yesterday Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
