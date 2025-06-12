@@ -32,22 +32,50 @@ class Master:
         self.timegrid = self.build_time_grid()
         self.master_integrated_time = self.build_master_integrated_time()
 
-    def build_time_grid(self, offset: int = 12) -> pd.DataFrame:
+    def build_time_grid(
+        self, offset: int = 12, end_date: str = "yesterday"
+    ) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
         with timestamps localized to the given timezone (e.g., America/Chicago).
+
+        Args:
+            offset (int):
+                Hour of day (0-23) at which each day's window begins (e.g., 12 for 12 PM).
+            end_date (str):
+                Which date to end the grid on. Must be one of:
+                - `"yesterday"`: uses `get_yesterdays_date(self.timezone)`
+                - `"today"`: uses `get_todays_date(self.timezone)`
+
+        Raises:
+            ValueError: If `end_date` is not `"yesterday"` or `"today"`.
+
+        Returns:
+            pd.DataFrame:
+                Single-column DataFrame named `"timestamp"`, containing one-minute
+                localized (to `self.timezone`) timestamps from the start to end.
 
         Definition updated on 2025-04-29, we define the date range to be up to yesterday 12pm at the
         time of running the program.
             - if the program is run on 2025-04-29, the date range will be
             - from 2025-04-14 12pm to 2025-04-28 12pm (America/Chicago)
             - aka we will not include the actual yesterday's data from 2025-04-28 12pm to 2025-04-29 12pm
+
+        Definition updated on 2025-06-12, we gave the option to specify the end_date. If it's "yesterday", then
+        the end date will be yesterday at 12pm, if it's "today", then the end date will be today at 12pm.
         """
         tz = pytz.timezone(self.timezone)
 
-        yesterday_date = get_yesterdays_date(self.timezone)
+        # Resolve the reference end date
+        if end_date.lower() == "yesterday":
+            ref_date_str = get_yesterdays_date(self.timezone)
+        elif end_date.lower() == "today":
+            ref_date_str = get_todays_date(self.timezone)
+        else:
+            raise ValueError("end_date must be either 'yesterday' or 'today'")
+
         # we need to get self.num_past_days + 1 days so that
         # we actually have self.num_past_days intervals
-        date_range = get_iter_dates(yesterday_date, self.sleep.num_past_days + 1)
+        date_range = get_iter_dates(ref_date_str, self.sleep.num_past_days + 1)
         start_date, end_date = date_range[0], date_range[-1]
 
         start_ts = pd.to_datetime(start_date).replace(hour=offset, minute=0, second=0)
