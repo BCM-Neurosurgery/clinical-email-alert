@@ -29,6 +29,7 @@ from trbdv0.constants import *
 from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import json
+from trbdv0.survey_processor import init_processor
 
 
 def main():
@@ -58,6 +59,7 @@ def main():
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     timezone = config["timezone"]
+    patient_surveys = config["patient_surveys"]
     quatrics_config_path = config["quatrics_config_path"]
     quatrics_sleep_reminder = config["quatrics_sleep_reminder"]
     quatrics_nonwear_reminder = config["quatrics_nonwear_reminder"]
@@ -131,6 +133,30 @@ def main():
             json.dump(patient_summary_stats, f, indent=4)
 
         master.plot_combined_sleep_and_met()
+
+        # TODO: initialize survey processors
+        pt_survey_strings = patient_surveys.get(patient, [])
+        quatrics_results = {}
+        for survey in pt_survey_strings:
+            # check if survey class is defined
+            class_path = SURVEY_CLASSES.get(survey)
+            if not class_path:
+                logger.warning(f"No survey processor class found for {survey}.")
+                continue
+
+            # check survey folder
+            survey_folder = os.path.join(input_dir, patient, "qualtrics", survey)
+            if not os.path.exists(survey_folder):
+                logger.warning(
+                    f"Survey folder {survey_folder} does not exist for {patient}."
+                )
+                continue
+
+            # dynamically import the survey processor clas
+            processor = init_processor(
+                SURVEY_CLASSES[survey], patient, survey_folder, patient_out_dir
+            )
+            quatrics_results[survey] = processor.get_latest_survey_results()
 
         # get attachments
         attachments = get_attachments(patient_out_dir)

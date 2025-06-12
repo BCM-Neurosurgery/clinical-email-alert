@@ -48,3 +48,10 @@ AVERAGE_STEPS_COLUMN = "Average Steps"
 
 LASTDAY_MET_COLUMN = "Yesterday Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
+
+# a mapping of survey IDs to processor classes
+SURVEY_CLASSES = {
+    "PHQ-8": "trbdv0.survey_processor.PHQ8Processor",
+    "ASRM": "trbdv0.survey_processor.ASRMProcessor",
+    "ISS": "trbdv0.survey_processor.ISSProcessor",
+}
