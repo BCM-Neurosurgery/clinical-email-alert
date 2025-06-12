@@ -29,8 +29,14 @@ class Master:
             self.sleep.patient_out_dir, f"{self.patient}.png"
         )
         self.patient = self.sleep.get_patient()
-        self.timegrid = self.build_time_grid()
-        self.master_integrated_time = self.build_master_integrated_time(self.timegrid)
+        self.analysis_timegrid = self.build_time_grid(end_date="yesterday")
+        self.master_integrated_time = self.build_master_integrated_time(
+            self.analysis_timegrid
+        )
+        self.plot_timegrid = self.build_time_grid(end_date="today")
+        self.plot_integrated_time = self.build_master_integrated_time(
+            self.plot_timegrid
+        )
 
     def build_time_grid(
         self, offset: int = 12, end_date: str = "yesterday"
@@ -381,7 +387,7 @@ class Master:
             "unidentified": "#ffe17b",  # soft yellow for unknown in-bed state
         }
 
-        df = self.master_integrated_time
+        df = self.plot_integrated_time
         if df.empty:
             print("No data to plot.")
             return
@@ -520,7 +526,7 @@ class Master:
         """
         Plots MET Gantt chart using 7 discrete color buckets. One row per day.
         """
-        df = self.master_integrated_time
+        df = self.plot_integrated_time
         if df.empty or "met" not in df.columns:
             print("No MET data to plot.")
             return
@@ -635,7 +641,7 @@ class Master:
         Returns:
             (fig, (ax1, ax2)): The matplotlib figure and axes tuple
         """
-        df = self.master_integrated_time
+        df = self.plot_integrated_time
 
         if df.empty or "in_bed" not in df.columns:
             self.logger.error(
