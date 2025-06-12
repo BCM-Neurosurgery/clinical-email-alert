@@ -30,7 +30,7 @@ class Master:
         )
         self.patient = self.sleep.get_patient()
         self.timegrid = self.build_time_grid()
-        self.master_integrated_time = self.build_master_integrated_time()
+        self.master_integrated_time = self.build_master_integrated_time(self.timegrid)
 
     def build_time_grid(
         self, offset: int = 12, end_date: str = "yesterday"
@@ -281,8 +281,19 @@ class Master:
 
         return pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
-    def build_master_integrated_time(self, offset: int = 12) -> pd.DataFrame:
+    def build_master_integrated_time(
+        self, time_grid: pd.DataFrame, offset: int = 12
+    ) -> pd.DataFrame:
         """Builds a unified 1-minute resolution timeline combining sleep, activity, and MET data.
+
+        Args:
+            time_grid (pd.DataFrame):
+                DataFrame with a “timestamp” column of 1-minute, localized datetimes
+                to use as the base timeline.
+            offset (int):
+                Number of hours to offset the day boundary (e.g., 12 means day runs
+                from 12 PM on one date to 12 PM the next). Used to compute
+                `shifted_day` and `shifted_hour`.
 
         Returns:
             pd.DataFrame: DataFrame indexed by timestamp with the following columns:
@@ -294,7 +305,7 @@ class Master:
                 - met: float MET value if available
         """
         # Base timeline
-        df = self.timegrid.copy()
+        df = time_grid.copy()
 
         # Sleep bedtimes
         df_in_bed = self.build_master_sleep_bedtimes()
