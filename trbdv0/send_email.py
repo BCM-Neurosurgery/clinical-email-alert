@@ -192,8 +192,13 @@ def generate_email_body(all_patient_stats: list) -> str:
     df_summary = pd.DataFrame(df_rows)
     df_survey = pd.DataFrame(survey_rows)
 
-    html_summary_table = df_summary.to_html(index=False, escape=False)
-    html_survey_table = df_survey.to_html(index=False, escape=False)
+    html_summary_table = "<h3>Daily Summary from Wearables</h3>" + df_summary.to_html(
+        index=False, escape=False
+    )
+
+    html_survey_table = "<h3>Recent Qualtrics Survey Scores</h3>" + df_survey.to_html(
+        index=False, escape=False
+    )
 
     lastday = get_last_day()
     yesterday = get_yesterdays_date()
