@@ -115,53 +115,86 @@ def generate_email_body(all_patient_stats: list) -> str:
         str: HTML table (as a string)
     """
     df_rows = []
+    survey_rows = []
+
+    def style(val, *flags):
+        if pd.isna(val) or any(warnings.get(flag, False) for flag in flags):
+            return f'<span style="background-color: #ff5252">{val}</span>'
+        return val
+
+    def format_score(survey: dict, score_key: str) -> str:
+        score = survey.get(score_key)
+        date = survey.get("EndDate")
+        if score is None:
+            return np.nan
+        if date:
+            date_str = date.split(" ")[0]  # Only keep the date part
+            return f"{score}<br><small style='color:#888'>{date_str}</small>"
+        return score
 
     for entry in all_patient_stats:
         summary = entry["summary"]
         warnings = entry["warning"]
         patient = summary["patient"]
+        surveys = entry.get("surveys", {})
 
-        def style(val, *flags):
-            if pd.isna(val) or any(warnings.get(flag, False) for flag in flags):
-                return f'<span style="background-color: #ff5252">{val}</span>'
-            return val
+        df_rows.append(
+            {
+                PT_COLUMN: patient,
+                LASTDAY_SLEEP_COLUMN: style(
+                    f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
+                    LASTDAY_SLEEP_NAN,
+                    LASTDAY_SLEEP_LESS_THAN_6,
+                    SLEEP_VARIATION,
+                ),
+                AVERAGE_SLEEP_COLUMN: style(
+                    f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
+                    AVERAGE_SLEEP_NAN,
+                ),
+                LASTDAY_STEPS_COLUMN: style(
+                    f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
+                    # LASTDAY_STEPS_NAN,
+                    # STEPS_VARIATION,
+                ),
+                AVERAGE_STEPS_COLUMN: style(
+                    f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
+                    # AVERAGE_STEPS_NAN,
+                ),
+                LASTDAY_MET_COLUMN: style(
+                    f"{summary.get(LASTDAY_MET, np.nan):.2f}",
+                    LASTDAY_MET_NAN,
+                    MET_VARIATION,
+                ),
+                AVERAGE_MET_COLUMN: style(
+                    f"{summary.get(AVERAGE_MET, np.nan):.2f}",
+                    AVERAGE_MET_NAN,
+                ),
+            }
+        )
 
-        row = {
-            PT_COLUMN: patient,
-            LASTDAY_SLEEP_COLUMN: style(
-                f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
-                LASTDAY_SLEEP_NAN,
-                LASTDAY_SLEEP_LESS_THAN_6,
-                SLEEP_VARIATION,
-            ),
-            AVERAGE_SLEEP_COLUMN: style(
-                f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
-                AVERAGE_SLEEP_NAN,
-            ),
-            LASTDAY_STEPS_COLUMN: style(
-                f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
-                # LASTDAY_STEPS_NAN,
-                # STEPS_VARIATION,
-            ),
-            AVERAGE_STEPS_COLUMN: style(
-                f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
-                # AVERAGE_STEPS_NAN,
-            ),
-            LASTDAY_MET_COLUMN: style(
-                f"{summary.get(LASTDAY_MET, np.nan):.2f}",
-                LASTDAY_MET_NAN,
-                MET_VARIATION,
-            ),
-            AVERAGE_MET_COLUMN: style(
-                f"{summary.get(AVERAGE_MET, np.nan):.2f}",
-                AVERAGE_MET_NAN,
-            ),
-        }
+        # Survey scores row
+        iss = surveys.get("ISS", {})
+        phq8 = surveys.get("PHQ-8", {})
+        asrm = surveys.get("ASRM", {})
 
-        df_rows.append(row)
+        survey_rows.append(
+            {
+                "Patient": patient,
+                "Activation (ISS)": format_score(iss, "SC1"),
+                "Well-being (ISS)": format_score(iss, "SC2"),
+                "Perceived Conflict (ISS)": format_score(iss, "SC3"),
+                "Depression Index (ISS)": format_score(iss, "SC4"),
+                "Depression Score (PHQ-8)": format_score(phq8, "SC0"),
+                "Mania Score (ASRM)": format_score(asrm, "SC0"),
+            }
+        )
 
-    df = pd.DataFrame(df_rows)
-    html_table = df.to_html(index=False, escape=False)
+    df_summary = pd.DataFrame(df_rows)
+    df_survey = pd.DataFrame(survey_rows)
+
+    html_summary_table = df_summary.to_html(index=False, escape=False)
+    html_survey_table = df_survey.to_html(index=False, escape=False)
+
     lastday = get_last_day()
     yesterday = get_yesterdays_date()
     today = get_todays_date()
@@ -179,7 +212,7 @@ def generate_email_body(all_patient_stats: list) -> str:
         f"</p>"
     )
 
-    return html_table + note
+    return html_summary_table + note + html_survey_table
 
 
 def get_attachments(dir: str):

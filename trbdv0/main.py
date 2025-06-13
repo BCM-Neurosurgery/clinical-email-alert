@@ -166,6 +166,7 @@ def main():
             {
                 "summary": patient_summary_stats,
                 "warning": warnings,
+                "surveys": quatrics_results,
             }
         )
 
