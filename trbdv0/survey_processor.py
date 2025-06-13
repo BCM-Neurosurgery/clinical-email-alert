@@ -3,6 +3,7 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from importlib import import_module
 from typing import List, Dict, Any
+from trbdv0.utils import get_yesterdays_date
 
 
 class SurveyProcessor(ABC):
@@ -171,6 +172,23 @@ class SurveyProcessor(ABC):
         latest_path = self.get_most_recent_survey_file()
         values = self.parse_csv(latest_path)
         return {"path": latest_path, **values}
+
+    def get_yesterday_warnings(self) -> Dict[str, bool]:
+        """
+        Check if the most recent survey was filled out yesterday,
+        and if so, return its warning flags; otherwise, return empty dict.
+        """
+        try:
+            latest = self.get_most_recent_survey_file()
+        except ValueError:
+            return {}
+
+        # Compare date portion of EndDate to yesterday's date
+        filled_datetime = self.get_survey_filled_date(latest)
+        filled_date = filled_datetime.split()[0]
+        if filled_date == get_yesterdays_date():
+            return self.get_warnings(latest)
+        return {}
 
 
 class PHQ8Processor(SurveyProcessor):
