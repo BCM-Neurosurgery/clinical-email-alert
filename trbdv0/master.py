@@ -409,6 +409,7 @@ class Master:
 
         for day in days:
             day_df = df[(df["shifted_day"] == day) & (df["in_bed"] == True)].copy()
+            is_yesterday = day == days[-1]
 
             if day_df.empty:
                 continue
@@ -425,6 +426,9 @@ class Master:
                         left=start,
                         height=0.6,
                         color=state_colors.get(state),
+                        alpha=(
+                            0.4 if is_yesterday else 1.0
+                        ),  # signal that yesterday's sleep is not included in table
                         edgecolor=(
                             "#888888" if state == "not_worn/battery_dead" else None
                         ),
