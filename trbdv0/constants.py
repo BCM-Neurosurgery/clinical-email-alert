@@ -48,3 +48,21 @@ AVERAGE_STEPS_COLUMN = "Average Steps"
 
 LASTDAY_MET_COLUMN = "Yesterday Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
+
+# a mapping of survey IDs to processor classes
+SURVEY_CLASSES = {
+    "PHQ-8": "trbdv0.survey_processor.PHQ8Processor",
+    "ASRM": "trbdv0.survey_processor.ASRMProcessor",
+    "ISS": "trbdv0.survey_processor.ISSProcessor",
+}
+
+# map each survey → which SC keys to highlight when any warnings fire
+HIGHLIGHT_KEYS = {
+    "ISS": ["SC1", "SC2"],
+    "PHQ-8": ["SC0"],
+    "ASRM": ["SC0"],
+}
+
+# currently only include TRBD patients for
+# email qualtric survey
+ALLOWED_SURVEY_PATIENTS = {"TRBD001", "TRBD002"}
