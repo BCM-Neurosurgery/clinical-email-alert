@@ -150,6 +150,15 @@ class SurveyProcessor(ABC):
             raise ValueError("Unable to determine most recent survey file.")
         return latest_file
 
+    @abstractmethod
+    def get_warnings(self, csv_path: str) -> Dict[str, bool]:
+        """
+        Evaluate warning flags for a single survey CSV.
+
+        Returns a mapping from warning name to True/False.
+        """
+        raise NotImplementedError("Subclasses must implement get_warnings")
+
     def get_latest_survey_results(self) -> Dict[str, Any]:
         """
         Get the most recent survey CSV and extract its numeric values.
@@ -168,6 +177,10 @@ class PHQ8Processor(SurveyProcessor):
     survey_id = "PHQ-8"
     columns_to_extract = ["SC0", "EndDate"]
 
+    def get_warnings(self, csv_path: str) -> Dict[str, bool]:
+        val = float(self.parse_csv(csv_path)["SC0"])
+        return {"Depression": val > 10}
+
 
 class ISSProcessor(SurveyProcessor):
     """Processor for the ISS (Inventory of Suicide Symptoms) survey."""
@@ -175,12 +188,27 @@ class ISSProcessor(SurveyProcessor):
     survey_id = "ISS"
     columns_to_extract = ["SC1", "SC2", "SC3", "SC4", "EndDate"]
 
+    def get_warnings(self, csv_path: str) -> Dict[str, bool]:
+        vals = self.parse_csv(csv_path)
+        activation = float(vals["SC1"])
+        well_being = float(vals["SC2"])
+        return {
+            "(Hypo)Mania": activation >= 155 and well_being >= 125,
+            "Mixed State": activation >= 155 and well_being < 125,
+            "Euthymia": activation < 155 and well_being >= 125,
+            "Depression": activation < 155 and well_being < 125,
+        }
+
 
 class ASRMProcessor(SurveyProcessor):
     """Processor for the ASRM (Altman Self-Rating Mania) survey."""
 
     survey_id = "ASRM"
     columns_to_extract = ["SC0", "EndDate"]
+
+    def get_warnings(self, csv_path: str) -> Dict[str, bool]:
+        val = float(self.parse_csv(csv_path)["SC0"])
+        return {"(Hypo)mania": val > 6}
 
 
 def init_processor(
