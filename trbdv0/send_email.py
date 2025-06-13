@@ -236,16 +236,23 @@ def generate_email_body(all_patient_stats: list) -> str:
         )
 
     df_summary = pd.DataFrame(df_rows)
-    df_survey = pd.DataFrame(survey_rows)
 
     html_summary_table = "<h3>Daily Summary from Wearables</h3>" + df_summary.to_html(
         index=False, escape=False, na_rep="nan"
     )
 
-    html_survey_table = (
-        "<h3>Most Recent Qualtrics Survey Scores</h3>"
-        + df_survey.to_html(index=False, escape=False, na_rep="nan")
-    )
+    # Determine if ANY patient is in the allowed list
+    patients = {entry["summary"]["patient"] for entry in all_patient_stats}
+    include_surveys = bool(patients & ALLOWED_SURVEY_PATIENTS)
+
+    html_survey_table = ""
+    if include_surveys:
+        # … [build survey_rows exactly as before] …
+        df_survey = pd.DataFrame(survey_rows)
+        html_survey_table = (
+            "<h3>Most Recent Qualtrics Survey Scores</h3>"
+            + df_survey.to_html(index=False, escape=False, na_rep="nan")
+        )
 
     lastday = get_last_day()
     yesterday = get_yesterdays_date()

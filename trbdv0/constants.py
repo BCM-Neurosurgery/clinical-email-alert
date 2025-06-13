@@ -62,3 +62,7 @@ HIGHLIGHT_KEYS = {
     "PHQ-8": ["SC0"],
     "ASRM": ["SC0"],
 }
+
+# currently only include TRBD patients for
+# email qualtric survey
+ALLOWED_SURVEY_PATIENTS = {"TRBD001", "TRBD002"}
