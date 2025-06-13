@@ -162,33 +162,29 @@ class SurveyProcessor(ABC):
 
     def get_latest_survey_results(self) -> Dict[str, Any]:
         """
-        Get the most recent survey CSV and extract its numeric values.
+        Get the most recent survey CSV, extract its values, and include yesterday's warnings.
 
-        Returns:
-            Dict[str, Any]: A dictionary containing:
-                - 'path': the file path of the most recent survey CSV
-                - each column from `columns_to_extract`: its extracted float value
+        Returns a dict containing:
+          - 'path': CSV file path
+          - each column in `columns_to_extract`: extracted raw value
+          - 'latest_warnings': latest warning flags
         """
         latest_path = self.get_most_recent_survey_file()
         values = self.parse_csv(latest_path)
-        return {"path": latest_path, **values}
+        latest_flags = self.get_latest_warnings()
+        return {"path": latest_path, **values, "latest_warnings": latest_flags}
 
-    def get_yesterday_warnings(self) -> Dict[str, bool]:
+    def get_latest_warnings(self) -> Dict[str, bool]:
         """
-        Check if the most recent survey was filled out yesterday,
-        and if so, return its warning flags; otherwise, return empty dict.
+        Return warning flags for the most recent survey CSV.
+
+        Returns empty dict if no survey files exist.
         """
         try:
             latest = self.get_most_recent_survey_file()
         except ValueError:
             return {}
-
-        # Compare date portion of EndDate to yesterday's date
-        filled_datetime = self.get_survey_filled_date(latest)
-        filled_date = filled_datetime.split()[0]
-        if filled_date == get_yesterdays_date():
-            return self.get_warnings(latest)
-        return {}
+        return self.get_warnings(latest)
 
 
 class PHQ8Processor(SurveyProcessor):

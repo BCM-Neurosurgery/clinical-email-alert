@@ -84,12 +84,27 @@ def generate_subject_line(all_patient_stats: list) -> str:
     # different than study ids on Elias, only
     # for email showing purpose
     study_name = all_patient_stats[0]["summary"]["study_name"]
+    yesterday_str = get_yesterdays_date()
 
     for entry in all_patient_stats:
         patient = entry["summary"]["patient"]
-        warnings = entry["warning"]
 
-        if any(warnings.values()):
+        # 1) any Wearables warning?
+        has_oura_warn = any(entry["warning"].values())
+
+        # 2) any Qualtrics warning from a survey filled *yesterday*?
+        has_qual_warn = False
+        for survey in entry.get("surveys", {}).values():
+            enddate = survey.get("EndDate", "")
+            date_part = enddate.split(" ")[0] if enddate else ""
+            # only consider warnings if the survey was completed yesterday
+            if date_part == yesterday_str and any(
+                survey.get("latest_warnings", {}).values()
+            ):
+                has_qual_warn = True
+                break
+
+        if has_oura_warn or has_qual_warn:
             needs_attention.append(patient)
         else:
             all_clear.append(patient)
@@ -122,15 +137,46 @@ def generate_email_body(all_patient_stats: list) -> str:
             return f'<span style="background-color: #ff5252">{val}</span>'
         return val
 
-    def format_score(survey: dict, score_key: str) -> str:
-        score = survey.get(score_key)
-        date = survey.get("EndDate")
-        if score is None:
+    def format_score(sdict: dict, key: str, survey_name: str) -> str:
+        """
+        Format a single survey subscale score for inclusion in the HTML table.
+
+        This will:
+        1. Look up the raw score by `key` (e.g. "SC1", "SC0") in `sdict`.
+        2. Check `sdict["yesterday_warnings"]` for any True flags.
+        3. If any warning is True and `key` is in HIGHLIGHT_KEYS[survey_name], wrap the score
+            in a red-background <span>.
+        4. Append the survey's EndDate (date-only) in a lighter <small> tag on a new line.
+        5. Return `np.nan` if the key is missing.
+
+        Args:
+            sdict (dict): Survey result dict containing at least:
+                        - the score under `key`
+                        - "EndDate" (a datetime string)
+                        - "yesterday_warnings" (dict of str→bool)
+            key (str): Subscale code, e.g. "SC1", "SC2", or "SC0".
+            survey_name (str): One of "ISS", "PHQ-8", or "ASRM" to select highlight logic.
+
+        Returns:
+            str or float: An HTML string like "80<br><small>2025-06-11</small>",
+                        possibly wrapped in <span style='background-color:#ff5252'>…</span>;
+                        or `np.nan` if `sdict.get(key)` is None.
+        """
+        raw = sdict.get(key)
+        if raw is None:
             return np.nan
-        if date:
-            date_str = date.split(" ")[0]  # Only keep the date part
-            return f"{score}<br><small style='color:#888'>{date_str}</small>"
-        return score
+
+        warn_dict = sdict.get("latest_warnings", {})
+        # highlight only if any warning and this subscale is in our map
+        if any(warn_dict.values()) and key in HIGHLIGHT_KEYS.get(survey_name, []):
+            raw = f"<span style='background-color:#ff5252'>{raw}</span>"
+
+        ed = sdict.get("EndDate", "")
+        if ed:
+            date_str = ed.split()[0]
+            return f"{raw}<br><small style='color:#888'>{date_str}</small>"
+
+        return raw
 
     for entry in all_patient_stats:
         summary = entry["summary"]
@@ -180,12 +226,12 @@ def generate_email_body(all_patient_stats: list) -> str:
         survey_rows.append(
             {
                 "Patient": patient,
-                "Activation (ISS)": format_score(iss, "SC1"),
-                "Well-being (ISS)": format_score(iss, "SC2"),
-                "Perceived Conflict (ISS)": format_score(iss, "SC3"),
-                "Depression Index (ISS)": format_score(iss, "SC4"),
-                "Depression Score (PHQ-8)": format_score(phq8, "SC0"),
-                "Mania Score (ASRM)": format_score(asrm, "SC0"),
+                "Activation (ISS)": format_score(iss, "SC1", "ISS"),
+                "Well-being (ISS)": format_score(iss, "SC2", "ISS"),
+                "Perceived Conflict (ISS)": format_score(iss, "SC3", "ISS"),
+                "Depression Index (ISS)": format_score(iss, "SC4", "ISS"),
+                "Depression Score (PHQ-8)": format_score(phq8, "SC0", "PHQ-8"),
+                "Mania Score (ASRM)": format_score(asrm, "SC0", "ASRM"),
             }
         )
 
@@ -193,11 +239,12 @@ def generate_email_body(all_patient_stats: list) -> str:
     df_survey = pd.DataFrame(survey_rows)
 
     html_summary_table = "<h3>Daily Summary from Wearables</h3>" + df_summary.to_html(
-        index=False, escape=False
+        index=False, escape=False, na_rep="nan"
     )
 
-    html_survey_table = "<h3>Recent Qualtrics Survey Scores</h3>" + df_survey.to_html(
-        index=False, escape=False
+    html_survey_table = (
+        "<h3>Most Recent Qualtrics Survey Scores</h3>"
+        + df_survey.to_html(index=False, escape=False, na_rep="nan")
     )
 
     lastday = get_last_day()

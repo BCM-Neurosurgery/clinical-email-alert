@@ -55,3 +55,10 @@ SURVEY_CLASSES = {
     "ASRM": "trbdv0.survey_processor.ASRMProcessor",
     "ISS": "trbdv0.survey_processor.ISSProcessor",
 }
+
+# map each survey → which SC keys to highlight when any warnings fire
+HIGHLIGHT_KEYS = {
+    "ISS": ["SC1", "SC2"],
+    "PHQ-8": ["SC0"],
+    "ASRM": ["SC0"],
+}
