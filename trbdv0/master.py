@@ -446,6 +446,8 @@ class Master:
         ax.tick_params("x", labelbottom=True)
         ax.set_yticks(range(len(days)))
         ax.set_yticklabels([str(day) for day in days])
+        # reserve exactly one “bar‐height” above and below
+        ax.set_ylim(-0.5, len(days) - 0.5)
         ax.set_title(f"{title} — Patient {self.patient}")
         ax.grid(True, axis="x", linestyle="--", alpha=0.5)
 
