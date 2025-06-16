@@ -271,7 +271,22 @@ def generate_email_body(all_patient_stats: list) -> str:
         f"</p>"
     )
 
-    return html_summary_table + note + html_survey_table
+    # 4) Survey scoring legend + ISS mood‐state thresholds
+    survey_note = ""
+    if include_surveys:
+        survey_note = (
+            "<p style='font-size:0.9em; color:#555;'>"
+            "<strong>Survey Score Thresholds:</strong><br>"
+            "• <strong>Activation ≥ 155 &amp; Well-Being ≥ 125</strong> -> (Hypo)mania<br>"
+            "• <strong>Activation ≥ 155 &amp; Well-Being &lt; 125</strong> -> Mixed State<br>"
+            "• <strong>Activation &lt; 155 &amp; Well-Being ≥ 125</strong> -> Euthymia<br>"
+            "• <strong>Activation &lt; 155 &amp; Well-Being &lt; 125</strong> -> Depression<br>"
+            "• <strong>PHQ-8 (SC0) &gt; 10</strong> → Depression<br>"
+            "• <strong>ASRM (SC0) &gt; 6</strong> → (Hypo)mania"
+            "</p>"
+        )
+
+    return html_summary_table + note + html_survey_table + survey_note
 
 
 def get_attachments(dir: str):
