@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from importlib import import_module
 from typing import List, Dict, Any
 from trbdv0.utils import get_yesterdays_date
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 class SurveyProcessor(ABC):
@@ -212,6 +214,166 @@ class ISSProcessor(SurveyProcessor):
             "Euthymia": activation < 155 and well_being >= 125,
             "Depression": activation < 155 and well_being < 125,
         }
+
+    def plot_historical_scores(
+        self,
+        output_filename: str = "ISS_historical_plot.png",
+        activation_cutoff: float = 155.0,
+        wellbeing_cutoff: float = 125.0,
+    ) -> str:
+        """
+        Generates and saves a plot of historical ISS scores over time.
+
+        The plot shows Activation vs. Well-Being scores, divided into four
+        quadrants. The chronological order of surveys is indicated by a
+        color gradient (older surveys are darker, newer are brighter) and
+        connecting lines, showing the patient's trajectory.
+
+        Args:
+            output_filename (str): The name for the output plot file.
+            activation_cutoff (float): The threshold for the Activation score.
+            wellbeing_cutoff (float): The threshold for the Well-Being score.
+
+        Returns:
+            str: The absolute path to the saved plot image.
+                 Returns an empty string if no data was found to plot.
+        """
+        all_files = [
+            file
+            for files_in_year in self.get_survey_files_by_year().values()
+            for file in files_in_year
+        ]
+
+        if not all_files:
+            print(f"No ISS survey files found for patient {self.patient_id}.")
+            return ""
+
+        # 1. Gather and parse all survey data
+        survey_data = []
+        for csv_path in all_files:
+            try:
+                scores = self.parse_csv(csv_path)
+                date_str = self.get_survey_filled_date(csv_path)
+                survey_data.append(
+                    {
+                        "date": pd.to_datetime(date_str),
+                        "activation": float(scores["SC1"]),
+                        "well_being": float(scores["SC2"]),
+                    }
+                )
+            except (ValueError, KeyError) as e:
+                print(f"Skipping file {os.path.basename(csv_path)} due to error: {e}")
+                continue
+
+        if not survey_data:
+            print(
+                f"No valid ISS score data could be extracted for patient {self.patient_id}."
+            )
+            return ""
+
+        # Create and sort dataframe
+        df = pd.DataFrame(survey_data).sort_values(by="date").reset_index()
+
+        # 2. Set up the plot
+        fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+
+        # Determine plot bounds
+        x_min, x_max = df.activation.min() - 10, df.activation.max() + 10
+        y_min, y_max = df.well_being.min() - 10, df.well_being.max() + 10
+
+        # 3. Draw and label the quadrants
+        ax.axvline(activation_cutoff, color="grey", linestyle="--", lw=1.5)
+        ax.axhline(wellbeing_cutoff, color="grey", linestyle="--", lw=1.5)
+
+        # Quadrant labels
+        text_props = dict(
+            ha="center", va="center", fontsize=14, fontweight="bold", color="white"
+        )
+        bg_props = dict(boxstyle="round,pad=0.5", fc="gray", ec="none", alpha=0.6)
+        ax.text(
+            x_min + (activation_cutoff - x_min) / 2,
+            y_min + (wellbeing_cutoff - y_min) / 2,
+            "Depression",
+            **text_props,
+            bbox=bg_props,
+        )
+        ax.text(
+            x_min + (activation_cutoff - x_min) / 2,
+            wellbeing_cutoff + (y_max - wellbeing_cutoff) / 2,
+            "Euthymia",
+            **text_props,
+            bbox=bg_props,
+        )
+        ax.text(
+            activation_cutoff + (x_max - activation_cutoff) / 2,
+            y_min + (wellbeing_cutoff - y_min) / 2,
+            "Mixed State",
+            **text_props,
+            bbox=bg_props,
+        )
+        ax.text(
+            activation_cutoff + (x_max - activation_cutoff) / 2,
+            wellbeing_cutoff + (y_max - wellbeing_cutoff) / 2,
+            "(Hypo)Mania",
+            **text_props,
+            bbox=bg_props,
+        )
+
+        # 4. Plot the data with chronological visualization
+        # Use numeric dates for color mapping
+        numeric_dates = mdates.date2num(df["date"])
+
+        # Plot connecting lines
+        ax.plot(
+            df["activation"],
+            df["well_being"],
+            color="grey",
+            linestyle="-",
+            alpha=0.5,
+            zorder=1,
+        )
+
+        # Plot scatter points with a color gradient for time
+        scatter = ax.scatter(
+            df["activation"],
+            df["well_being"],
+            c=numeric_dates,
+            cmap="viridis",  # 'viridis' is a good choice for visibility
+            s=100,  # Size of the markers
+            edgecolors="black",
+            zorder=2,
+        )
+
+        # 5. Finalize plot aesthetics
+        ax.set_title(
+            f"ISS Score Trajectory for Patient: {self.patient_id}", fontsize=16, pad=20
+        )
+        ax.set_xlabel("Activation Score (SC1)", fontsize=12)
+        ax.set_ylabel("Well-Being Score (SC2)", fontsize=12)
+        ax.grid(True, which="both", linestyle=":", linewidth="0.5", color="gray")
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+
+        # Add a colorbar to show the date mapping
+        cbar = fig.colorbar(scatter, ax=ax, pad=0.02)
+        cbar.set_label("Survey Date", fontsize=12)
+        # Format colorbar ticks as dates
+        tick_locs = cbar.get_ticks()
+        cbar.ax.set_yticklabels(
+            [mdates.num2date(loc).strftime("%Y-%m-%d") for loc in tick_locs]
+        )
+
+        fig.tight_layout()
+
+        # 6. Save the figure
+        # Ensure the output directory exists
+        os.makedirs(self.patient_out_dir, exist_ok=True)
+        output_path = os.path.join(self.patient_out_dir, output_filename)
+        fig.savefig(output_path)
+        plt.close(fig)  # Free up memory
+
+        print(f"Plot saved successfully to {output_path}")
+        return output_path
 
 
 class ASRMProcessor(SurveyProcessor):

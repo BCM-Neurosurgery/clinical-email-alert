@@ -29,7 +29,7 @@ from trbdv0.constants import *
 from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import json
-from trbdv0.survey_processor import init_processor
+from trbdv0.survey_processor import init_processor, ISSProcessor
 
 
 def main():
@@ -157,6 +157,10 @@ def main():
                 SURVEY_CLASSES[survey], patient, survey_folder, patient_out_dir
             )
             quatrics_results[survey] = processor.get_latest_survey_results()
+            if isinstance(processor, ISSProcessor):
+                logger.info(f"Generating historical ISS plot for {patient}...")
+                # The plot is saved directly to patient_out_dir by the method itself.
+                processor.plot_historical_scores()
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
