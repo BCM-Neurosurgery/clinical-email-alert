@@ -226,8 +226,8 @@ class ISSProcessor(SurveyProcessor):
 
         The plot shows Activation vs. Well-Being scores, divided into four
         quadrants. The chronological order of surveys is indicated by a
-        color gradient (older surveys are darker, newer are brighter) and
-        connecting lines, showing the patient's trajectory.
+        color gradient. The plot axes are dynamically set to ensure all four
+        quadrants are always visible, regardless of data distribution.
 
         Args:
             output_filename (str): The name for the output plot file.
@@ -248,7 +248,6 @@ class ISSProcessor(SurveyProcessor):
             print(f"No ISS survey files found for patient {self.patient_id}.")
             return ""
 
-        # 1. Gather and parse all survey data
         survey_data = []
         for csv_path in all_files:
             try:
@@ -271,83 +270,123 @@ class ISSProcessor(SurveyProcessor):
             )
             return ""
 
-        # Create and sort dataframe
         df = pd.DataFrame(survey_data).sort_values(by="date").reset_index()
 
-        # 2. Set up the plot
         fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
-        # Determine plot bounds
-        x_min, x_max = df.activation.min() - 10, df.activation.max() + 10
-        y_min, y_max = df.well_being.min() - 10, df.well_being.max() + 10
+        # Enforce a minimum size for each quadrant to ensure labels fit.
+        padding = 15  # Extra space around the edges of the plot
+        min_quadrant_width = 80  # Minimum space on each side of the vertical cutoff
+        min_quadrant_height = 60  # Minimum space on each side of the horizontal cutoff
 
-        # 3. Draw and label the quadrants
+        # --- Calculate X-axis limits ---
+        # Find data range left of the cutoff
+        data_on_left = df.activation[df.activation < activation_cutoff]
+        data_width_left = (
+            activation_cutoff - data_on_left.min() if not data_on_left.empty else 0
+        )
+        final_width_left = max(data_width_left, min_quadrant_width)
+        x_min_bound = activation_cutoff - final_width_left
+
+        # Find data range right of the cutoff
+        data_on_right = df.activation[df.activation > activation_cutoff]
+        data_width_right = (
+            data_on_right.max() - activation_cutoff if not data_on_right.empty else 0
+        )
+        final_width_right = max(data_width_right, min_quadrant_width)
+        x_max_bound = activation_cutoff + final_width_right
+
+        ax.set_xlim(x_min_bound - padding, x_max_bound + padding)
+
+        # --- Calculate Y-axis limits ---
+        # Find data range below the cutoff
+        data_below = df.well_being[df.well_being < wellbeing_cutoff]
+        data_height_below = (
+            wellbeing_cutoff - data_below.min() if not data_below.empty else 0
+        )
+        final_height_below = max(data_height_below, min_quadrant_height)
+        y_min_bound = wellbeing_cutoff - final_height_below
+
+        # Find data range above the cutoff
+        data_above = df.well_being[df.well_being > wellbeing_cutoff]
+        data_height_above = (
+            data_above.max() - wellbeing_cutoff if not data_above.empty else 0
+        )
+        final_height_above = max(data_height_above, min_quadrant_height)
+        y_max_bound = wellbeing_cutoff + final_height_above
+
+        ax.set_ylim(y_min_bound - padding, y_max_bound + padding)
+
+        # Get final plot limits for label placement
+        final_xlim = ax.get_xlim()
+        final_ylim = ax.get_ylim()
+
+        # Draw quadrant lines
         ax.axvline(activation_cutoff, color="grey", linestyle="--", lw=1.5)
         ax.axhline(wellbeing_cutoff, color="grey", linestyle="--", lw=1.5)
 
-        # Quadrant labels
+        # Place quadrant labels dynamically based on final plot boundaries
         text_props = dict(
             ha="center", va="center", fontsize=14, fontweight="bold", color="white"
         )
         bg_props = dict(boxstyle="round,pad=0.5", fc="gray", ec="none", alpha=0.6)
+
+        # Depression (bottom-left)
         ax.text(
-            x_min + (activation_cutoff - x_min) / 2,
-            y_min + (wellbeing_cutoff - y_min) / 2,
+            (final_xlim[0] + activation_cutoff) / 2,
+            (final_ylim[0] + wellbeing_cutoff) / 2,
             "Depression",
             **text_props,
             bbox=bg_props,
         )
+        # Euthymia (top-left)
         ax.text(
-            x_min + (activation_cutoff - x_min) / 2,
-            wellbeing_cutoff + (y_max - wellbeing_cutoff) / 2,
+            (final_xlim[0] + activation_cutoff) / 2,
+            (wellbeing_cutoff + final_ylim[1]) / 2,
             "Euthymia",
             **text_props,
             bbox=bg_props,
         )
+        # Mixed State (bottom-right)
         ax.text(
-            activation_cutoff + (x_max - activation_cutoff) / 2,
-            y_min + (wellbeing_cutoff - y_min) / 2,
+            (activation_cutoff + final_xlim[1]) / 2,
+            (final_ylim[0] + wellbeing_cutoff) / 2,
             "Mixed State",
             **text_props,
             bbox=bg_props,
         )
+        # (Hypo)Mania (top-right)
         ax.text(
-            activation_cutoff + (x_max - activation_cutoff) / 2,
-            wellbeing_cutoff + (y_max - wellbeing_cutoff) / 2,
+            (activation_cutoff + final_xlim[1]) / 2,
+            (wellbeing_cutoff + final_ylim[1]) / 2,
             "(Hypo)Mania",
             **text_props,
             bbox=bg_props,
         )
 
-        # 4. Plot the data with chronological visualization
-        # Use numeric dates for color mapping
+        # Plot the data
         numeric_dates = mdates.date2num(df["date"])
-
-        # Plot scatter points with a color gradient for time
         scatter = ax.scatter(
             df["activation"],
             df["well_being"],
             c=numeric_dates,
-            cmap="viridis",  # 'viridis' is a good choice for visibility
-            s=100,  # Size of the markers
+            cmap="viridis",
+            s=120,
             edgecolors="black",
             zorder=2,
         )
 
-        # 5. Finalize plot aesthetics
+        # Finalize plot aesthetics
         ax.set_title(
-            f"ISS Score Trajectory for Patient: {self.patient_id}", fontsize=16, pad=20
+            f"ISS Score History for Patient: {self.patient_id}", fontsize=16, pad=20
         )
         ax.set_xlabel("Activation Score (SC1)", fontsize=12)
         ax.set_ylabel("Well-Being Score (SC2)", fontsize=12)
         ax.grid(True, which="both", linestyle=":", linewidth="0.5", color="gray")
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
 
-        # Add a colorbar to show the date mapping
+        # Add and format the colorbar
         cbar = fig.colorbar(scatter, ax=ax, pad=0.02)
         cbar.set_label("Survey Date", fontsize=12)
-        # Format colorbar ticks as dates
         tick_locs = cbar.get_ticks()
         cbar.ax.set_yticklabels(
             [mdates.num2date(loc).strftime("%Y-%m-%d") for loc in tick_locs]
@@ -355,12 +394,11 @@ class ISSProcessor(SurveyProcessor):
 
         fig.tight_layout()
 
-        # 6. Save the figure
-        # Ensure the output directory exists
+        # Save the figure
         os.makedirs(self.patient_out_dir, exist_ok=True)
         output_path = os.path.join(self.patient_out_dir, output_filename)
         fig.savefig(output_path)
-        plt.close(fig)  # Free up memory
+        plt.close(fig)
 
         print(f"Plot saved successfully to {output_path}")
         return output_path
