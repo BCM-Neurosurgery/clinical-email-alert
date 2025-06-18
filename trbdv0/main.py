@@ -157,10 +157,15 @@ def main():
                 SURVEY_CLASSES[survey], patient, survey_folder, patient_out_dir
             )
             quatrics_results[survey] = processor.get_latest_survey_results()
-            if isinstance(processor, ISSProcessor):
-                logger.info(f"Generating historical ISS plot for {patient}...")
-                # The plot is saved directly to patient_out_dir by the method itself.
-                processor.plot_historical_scores()
+            if hasattr(processor, "plot_historical_scores"):
+                survey_name = processor.survey_id
+                safe_survey_name = survey_name.replace("-", "_").replace(" ", "_")
+                logger.info(
+                    f"Generating historical {survey_name} plot for {patient}..."
+                )
+                processor.plot_historical_scores(
+                    output_filename=f"{patient}_{safe_survey_name}.png"
+                )
 
         # get attachments
         attachments = get_attachments(patient_out_dir)

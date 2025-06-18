@@ -197,6 +197,125 @@ class PHQ8Processor(SurveyProcessor):
         val = float(self.parse_csv(csv_path)["SC0"])
         return {"Depression": val > 10}
 
+    def plot_historical_scores(
+        self,
+        output_filename: str = "PHQ8_historical_plot.png",
+        cutoff: float = 10.0,
+    ) -> str:
+        """
+        Generates a time-series plot of PHQ-8 scores.
+
+        The plot shows the score on the y-axis against the date on the
+        x-axis. A horizontal line and shaded region indicate the clinical
+        cutoff for likely major depression.
+
+        Args:
+            output_filename (str): The name for the output plot file.
+            cutoff (float): The clinical cutoff score.
+
+        Returns:
+            str: The absolute path to the saved plot image, or an empty
+                 string if no data was found.
+        """
+        all_files = [
+            file
+            for files_in_year in self.get_survey_files_by_year().values()
+            for file in files_in_year
+        ]
+        if not all_files:
+            print(f"No {self.survey_id} files found for patient {self.patient_id}.")
+            return ""
+
+        survey_data = []
+        for csv_path in all_files:
+            try:
+                scores = self.parse_csv(csv_path)
+                date_str = self.get_survey_filled_date(csv_path)
+                survey_data.append(
+                    {
+                        "date": pd.to_datetime(date_str),
+                        "score": float(scores["SC0"]),
+                    }
+                )
+            except (ValueError, KeyError) as e:
+                print(f"Skipping file {os.path.basename(csv_path)} due to error: {e}")
+                continue
+
+        if not survey_data:
+            print(
+                f"No valid {self.survey_id} data found for patient {self.patient_id}."
+            )
+            return ""
+
+        df = pd.DataFrame(survey_data).sort_values(by="date")
+
+        fig, ax = plt.subplots(figsize=(12, 7), dpi=150)
+
+        # Plot the data points and connecting line
+        ax.plot(
+            df["date"],
+            df["score"],
+            color="royalblue",
+            alpha=0.6,
+            marker="o",
+            linestyle="-",
+            zorder=2,
+            markeredgecolor="black",
+        )
+
+        # Add cutoff line
+        ax.axhline(cutoff, color="darkred", linestyle="--", lw=1.5, zorder=1)
+
+        # Set y-axis limits to provide space for the shaded region
+        y_max = max(df.score.max(), cutoff) * 1.15 + 2
+        ax.set_ylim(bottom=-1, top=y_max)
+
+        # Shade the "at-risk" area using axhspan
+        ax.axhspan(cutoff, y_max, facecolor="red", alpha=0.15, zorder=0)
+
+        # Add text label to explain the shaded region
+        ax.text(
+            df["date"].min(),
+            cutoff + (y_max - cutoff) * 0.5,
+            "Depression Range",
+            fontsize=14,
+            color="darkred",
+            alpha=0.8,
+            ha="left",
+            va="center",
+            style="italic",
+            bbox=dict(
+                facecolor="white", alpha=0.5, edgecolor="none", boxstyle="round,pad=0.2"
+            ),
+        )
+
+        # Finalize plot aesthetics
+        ax.set_title(
+            f"PHQ-8 Score History for Patient: {self.patient_id}", fontsize=16, pad=20
+        )
+        ax.set_xlabel("Date", fontsize=12)
+        ax.set_ylabel("PHQ-8 Score", fontsize=12)
+        ax.grid(
+            True, which="major", axis="y", linestyle=":", linewidth="0.5", color="gray"
+        )
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        # Format dates on x-axis for readability
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+        fig.autofmt_xdate()
+
+        fig.tight_layout()
+
+        # Save the figure
+        os.makedirs(self.patient_out_dir, exist_ok=True)
+        output_path = os.path.join(self.patient_out_dir, output_filename)
+        fig.savefig(output_path)
+        plt.close(fig)
+
+        print(f"Plot saved successfully to {output_path}")
+        return output_path
+
 
 class ISSProcessor(SurveyProcessor):
     """Processor for the ISS (Inventory of Suicide Symptoms) survey."""
@@ -413,6 +532,125 @@ class ASRMProcessor(SurveyProcessor):
     def get_warnings(self, csv_path: str) -> Dict[str, bool]:
         val = float(self.parse_csv(csv_path)["SC0"])
         return {"(Hypo)mania": val > 6}
+
+    def plot_historical_scores(
+        self,
+        output_filename: str = "ASRM_historical_plot.png",
+        cutoff: float = 6.0,
+    ) -> str:
+        """
+        Generates a time-series plot of ASRM scores.
+
+        The plot shows the score on the y-axis against the date on the
+        x-axis. A horizontal line and shaded region indicate the clinical
+        cutoff for a likely (hypo)manic state.
+
+        Args:
+            output_filename (str): The name for the output plot file.
+            cutoff (float): The clinical cutoff score.
+
+        Returns:
+            str: The absolute path to the saved plot image, or an empty
+                 string if no data was found.
+        """
+        all_files = [
+            file
+            for files_in_year in self.get_survey_files_by_year().values()
+            for file in files_in_year
+        ]
+        if not all_files:
+            print(f"No {self.survey_id} files found for patient {self.patient_id}.")
+            return ""
+
+        survey_data = []
+        for csv_path in all_files:
+            try:
+                scores = self.parse_csv(csv_path)
+                date_str = self.get_survey_filled_date(csv_path)
+                survey_data.append(
+                    {
+                        "date": pd.to_datetime(date_str),
+                        "score": float(scores["SC0"]),
+                    }
+                )
+            except (ValueError, KeyError) as e:
+                print(f"Skipping file {os.path.basename(csv_path)} due to error: {e}")
+                continue
+
+        if not survey_data:
+            print(
+                f"No valid {self.survey_id} data found for patient {self.patient_id}."
+            )
+            return ""
+
+        df = pd.DataFrame(survey_data).sort_values(by="date")
+
+        fig, ax = plt.subplots(figsize=(12, 7), dpi=150)
+
+        # Plot the data points and connecting line
+        ax.plot(
+            df["date"],
+            df["score"],
+            color="darkorange",
+            alpha=0.7,
+            marker="o",
+            linestyle="-",
+            zorder=2,
+            markeredgecolor="black",
+        )
+
+        # Add cutoff line
+        ax.axhline(cutoff, color="purple", linestyle="--", lw=1.5, zorder=1)
+
+        # Set y-axis limits
+        y_max = max(df.score.max(), cutoff) * 1.15 + 2
+        ax.set_ylim(bottom=-1, top=y_max)
+
+        # Shade the "at-risk" area
+        ax.axhspan(cutoff, y_max, facecolor="purple", alpha=0.1, zorder=0)
+
+        # Add text label
+        ax.text(
+            df["date"].min(),
+            cutoff + (y_max - cutoff) * 0.5,
+            "(Hypo)mania Range",
+            fontsize=14,
+            color="purple",
+            alpha=0.8,
+            ha="left",
+            va="center",
+            style="italic",
+            bbox=dict(
+                facecolor="white", alpha=0.5, edgecolor="none", boxstyle="round,pad=0.2"
+            ),
+        )
+
+        # Finalize plot aesthetics
+        ax.set_title(
+            f"ASRM Score History for Patient: {self.patient_id}", fontsize=16, pad=20
+        )
+        ax.set_xlabel("Date", fontsize=12)
+        ax.set_ylabel("ASRM Score", fontsize=12)
+        ax.grid(
+            True, which="major", axis="y", linestyle=":", linewidth="0.5", color="gray"
+        )
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        # Format dates on x-axis
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+        fig.autofmt_xdate()
+
+        fig.tight_layout()
+
+        # Save the figure
+        os.makedirs(self.patient_out_dir, exist_ok=True)
+        output_path = os.path.join(self.patient_out_dir, output_filename)
+        fig.savefig(output_path)
+        plt.close(fig)
+
+        print(f"Plot saved successfully to {output_path}")
+        return output_path
 
 
 def init_processor(

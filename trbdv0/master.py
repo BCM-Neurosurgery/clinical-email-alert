@@ -26,7 +26,7 @@ class Master:
         self.study_name = self.sleep.study_name
         self.patient = self.sleep.get_patient()
         self.plot_save_path = os.path.join(
-            self.sleep.patient_out_dir, f"{self.patient}.png"
+            self.sleep.patient_out_dir, f"{self.patient}_wearables.png"
         )
         self.patient = self.sleep.get_patient()
         self.analysis_timegrid = self.build_time_grid(end_date="yesterday")
