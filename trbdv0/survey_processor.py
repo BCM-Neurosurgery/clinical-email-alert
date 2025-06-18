@@ -323,16 +323,6 @@ class ISSProcessor(SurveyProcessor):
         # Use numeric dates for color mapping
         numeric_dates = mdates.date2num(df["date"])
 
-        # Plot connecting lines
-        ax.plot(
-            df["activation"],
-            df["well_being"],
-            color="grey",
-            linestyle="-",
-            alpha=0.5,
-            zorder=1,
-        )
-
         # Plot scatter points with a color gradient for time
         scatter = ax.scatter(
             df["activation"],
