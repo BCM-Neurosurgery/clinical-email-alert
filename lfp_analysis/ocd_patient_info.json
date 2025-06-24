@@ -1,0 +1,167 @@
+{
+    "B002": {
+        "directory": "Z:/PerceptOCD-48392/002/LFP",
+        "dbs_date": "2021-04-06",
+        "response_status": 0,
+        "disinhibited_dates": [
+            53,
+            62
+        ]
+    },
+    "B004": {
+        "directory": "Z:/PerceptOCD-48392/004/LFP",
+        "dbs_date": "2021-08-05",
+        "response_status": 1,
+        "response_date": 184,
+        "disinhibited_dates": [
+            2,
+            8
+        ]
+    },
+    "B005": {
+        "directory": "Z:/PerceptOCD-48392/005/LFP",
+        "dbs_date": "2022-03-10",
+        "response_status": 1,
+        "response_date": 95,
+        "disinhibited_dates": [
+            0,
+            4
+        ]
+    },
+    "B006": {
+        "directory": "Z:/PerceptOCD-48392/006/LFP",
+        "dbs_date": "2022-03-17",
+        "response_status": 0
+    },
+    "B007": {
+        "directory": "Z:/PerceptOCD-48392/007/LFP",
+        "dbs_date": "2022-04-25",
+        "response_status": 1,
+        "response_date": 21
+    },
+    "B008": {
+        "directory": "Z:/PerceptOCD-48392/008/LFP",
+        "dbs_date": "2023-01-25",
+        "response_status": 0
+    },
+    "B009": {
+        "directory": "Z:/PerceptOCD-48392/009/LFP",
+        "dbs_date": "2020-08-11",
+        "response_status": 1,
+        "response_date": 241
+    },
+    "B010": {
+        "directory": "Z:/PerceptOCD-48392/010/LFP",
+        "dbs_date": "2024-01-11",
+        "response_status": 0
+    },
+    "B011": {
+        "directory": "Z:/PerceptOCD-48392/011/LFP",
+        "dbs_date": "2024-01-04",
+        "response_status": 1,
+        "response_date": 13,
+        "disinhibited_dates": [
+            0,
+            7
+        ]
+    },
+    "B012": {
+        "directory": "Z:/PerceptOCD-48392/012/LFP",
+        "dbs_date": "2020-02-18",
+        "response_status": 1,
+        "response_date": 457
+    },
+    "B013": {
+        "directory": "Z:/PerceptOCD-48392/013/LFP",
+        "dbs_date": "2024-03-14",
+        "response_status": 1,
+        "response_date": 28,
+        "disinhibited_dates": [
+            0,
+            1
+        ]
+    },
+    "B014": {
+        "directory": "Z:/PerceptOCD-48392/014/LFP",
+        "dbs_date": "2021-08-13",
+        "response_status": 1,
+        "response_date": 218
+    },
+    "B015": {
+        "directory": "Z:/PerceptOCD-48392/015/LFP",
+        "dbs_date": "2022-05-18",
+        "response_status": 1,
+        "response_date": 348
+    },
+    "B016": {
+        "directory": "Z:/PerceptOCD-48392/016/LFP",
+        "dbs_date": "2021-12-03",
+        "response_status": 1,
+        "response_date": 154
+    },
+    "B017": {
+        "directory": "Z:/PerceptOCD-48392/017/LFP",
+        "dbs_date": "2022-09-09",
+        "response_status": 0
+    },
+    "B018": {
+        "directory": "Z:/PerceptOCD-48392/018/LFP",
+        "dbs_date": "2022-04-07",
+        "response_status": 1,
+        "response_date": 18
+    },
+    "B019": {
+        "directory": "Z:/PerceptOCD-48392/019/LFP",
+        "dbs_date": "2024-08-13",
+        "response_status": 0
+    },
+    "B020": {
+        "directory": "Z:/PerceptOCD-48392/020/LFP",
+        "dbs_date": "2019-12-04",
+        "response_status": 1,
+        "response_date": 187
+    },
+    "AA01": {
+        "directory": "Y:/DBSPsych-56119/LFP/R/DBSOCD001",
+        "dbs_date": "2025-01-28",
+        "response_status": 0
+    },
+    "AA02": {
+        "directory": "Y:/DBSPsych-56119/LFP/R/DBSOCD002",
+        "dbs_date": "2025-04-10",
+        "response_status": 0
+    },
+    "U001": {
+        "directory": "C:/Users/jeffr/Box/Data/NatMed2024_Utah/JSONS/RR_JSON",
+        "dbs_date": "2023-08-14",
+        "response_status": 0
+    },
+    "U002": {
+        "directory": "C:/Users/jeffr/Box/Data/NatMed2024_Utah/JSONS/JC_JSON",
+        "dbs_date": "2023-08-10",
+        "response_status": 1,
+        "response_date": 102
+    },
+    "U003": {
+        "directory": "C:/Users/jeffr/Box/Data/NatMed2024_Utah/JSONS/SG_JSON",
+        "dbs_date": "2023-12-05",
+        "response_status": 1,
+        "response_date": 462
+    },
+    "U004": {
+        "directory": "C:/Users/jeffr/Box/Data/Patient ID U004",
+        "dbs_date": "2025-01-06",
+        "response_status": 0
+    },
+    "B001": {
+        "directory": "Z:\\PerceptOCD-48392\\001\\LFP",
+        "dbs_date": "2021-01-28",
+        "response_status": 1,
+        "response_date": 48
+    },
+    "AA04": {
+        "directory": "Y:\\DBSPsych-56119\\LFP\\R\\DBSOCD004",
+        "dbs_date": "2025-06-12",
+        "response_status": 0
+    }
+}

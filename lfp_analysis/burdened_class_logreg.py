@@ -161,10 +161,5 @@ def plot_regression_threshold(ax, pt, df, model, features):
     ax.hlines(-model.intercept_[0] / model.coef_[0][0], *ax.get_xlim(), color='black', ls='--')
     if 0 > df.query('pt_id == @pt')['days_since_dbs'].values[0] and 0 < df.query('pt_id == @pt')['days_since_dbs'].values[-1]:
         ax.vlines(0, ymin=-1.5, ymax=1.5, color='hotpink', ls='--' ,lw=3)
-    if not df.query('pt_id == @pt and State_Label == 1').empty and pt in ['B001', 'B004', 'B005', 'B011', 'B013']:
-        f = features[0] if len(features) == 1 else features[1]
-        day_cross = np.where(df.query('pt_id == @pt')[f].rolling(window=5, min_periods=1).mean() <= -model.intercept_[0] / model.coef_[0][0])[0][0]
-        ax.vlines(day_cross, ymin=-1.5, ymax=1.5, color='red', ls='--', lw=2, label=f'{day_cross}')
-        print(day_cross)
     ax.set(xlabel='Days since DBS', ylabel=f, title=f'{pt}', xlim=ax.get_xlim())
     return ax 
