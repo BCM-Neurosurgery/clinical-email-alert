@@ -52,6 +52,7 @@ def plot_lfp_heatmap(pt, df):
 
 
 def plot_data(patient, pt_info, df, hemisphere='left'):
+    # Initialize plot paramaeters
     model = 'OvER'
 
     pt_df = df.query('pt_id == @patient')
@@ -226,13 +227,4 @@ def plot_data(patient, pt_info, df, hemisphere='left'):
     fig.update_yaxes(range=(-0.5, 1), row=2, col=4, tickfont=dict(color=axis_title_font_color), titlefont=dict(color=axis_title_font_color), showline=True, linecolor=axis_line_color)
     fig.update_xaxes(tickfont=dict(color=axis_title_font_color), titlefont=dict(color=axis_title_font_color), showline=True, linecolor=axis_line_color)
 
-    fig.update_layout(
-        legend=dict(
-            orientation="h",  # Horizontal orientation
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
     return fig
