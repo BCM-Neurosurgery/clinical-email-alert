@@ -21,7 +21,11 @@ def config_dash(pt_name: str):
         return 
 
     # Analyze LFP data for the patient
-    raw_df, pt_changes_df = generate_raw(pt_name, pt_info[pt_name])
+    try:
+        raw_df, pt_changes_df = generate_raw(pt_name, pt_info[pt_name])
+    except Exception as e:
+        print(f'Error generating data, {e}')
+        return
     processed_data = process_data(pt_name, raw_df, pt_info[pt_name])
     df_w_preds = model_data(processed_data)
 
@@ -32,7 +36,7 @@ def config_dash(pt_name: str):
     return df_w_preds, fig
 
 def main():
-    pt_name = 'TRBD001'
+    pt_name = 'TRBD002'
     df, fig = config_dash(pt_name)
     fig.show()
 
