@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import model_utils
+import lfp_analysis.model_utils as model_utils
 
 def model_data(df: pd.DataFrame, window_size=3, causal=True, use_constant=False):
     feature_names = ['OvER']

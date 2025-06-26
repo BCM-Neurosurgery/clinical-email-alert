@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import utils
+import lfp_analysis.utils as utils
 from zoneinfo import ZoneInfo
 from datetime import time as dttime
 from datetime import timedelta, datetime, date

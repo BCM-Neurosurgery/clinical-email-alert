@@ -4,7 +4,7 @@ import numpy as np
 from datetime import timedelta, datetime, date
 from datetime import time as dttime
 from zoneinfo import ZoneInfo
-import json_utils
+import lfp_analysis.json_utils as json_utils
 
 
 def generate_raw(pt_name: str, patient_dict: dict):
