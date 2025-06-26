@@ -6,6 +6,8 @@ from typing import List, Dict, Any
 from trbdv0.utils import get_yesterdays_date
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.colors import Normalize
+import matplotlib.cm as cm
 
 
 class SurveyProcessor(ABC):
@@ -483,16 +485,49 @@ class ISSProcessor(SurveyProcessor):
             bbox=bg_props,
         )
 
-        # Plot the data
+        # 1. Separate historical data from the most recent score
+        df_historical = df.iloc[:-1]
+        df_most_recent = df.iloc[-1:]
+
+        # 2. Set up colormap normalization based on the full date range of the original dataframe
         numeric_dates = mdates.date2num(df["date"])
-        scatter = ax.scatter(
-            df["activation"],
-            df["well_being"],
-            c=numeric_dates,
-            cmap="viridis",
-            s=120,
-            edgecolors="black",
-            zorder=2,
+        # Handle case with single data point where min and max would be the same
+        norm = (
+            Normalize(vmin=numeric_dates.min(), vmax=numeric_dates.max())
+            if len(numeric_dates) > 1
+            else Normalize(vmin=numeric_dates[0] - 1, vmax=numeric_dates[0] + 1)
+        )
+        cmap = "viridis"
+
+        # 3. Plot historical scores (if any) with standard circle markers
+        if not df_historical.empty:
+            ax.scatter(
+                df_historical["activation"],
+                df_historical["well_being"],
+                c=mdates.date2num(df_historical["date"]),
+                cmap=cmap,
+                norm=norm,  # Apply the common normalization
+                s=120,
+                edgecolors="black",
+                zorder=2,
+            )
+
+        # 4. Plot the most recent score with a star marker
+        # This is guaranteed to have one row if we passed the initial "if not survey_data" check
+        ax.scatter(
+            df_most_recent["activation"].values[0],
+            df_most_recent["well_being"].values[0],
+            c=[
+                mdates.date2num(df_most_recent["date"]).item()
+            ],  # Pass color value in a list
+            cmap=cmap,
+            norm=norm,  # Apply the same normalization
+            marker="*",
+            s=450,
+            edgecolors="white",
+            linewidth=1.5,
+            zorder=3,  # Place it on top
+            label="Most Recent Score",
         )
 
         # Finalize plot aesthetics
@@ -503,8 +538,15 @@ class ISSProcessor(SurveyProcessor):
         ax.set_ylabel("Well-Being Score (SC2)", fontsize=12)
         ax.grid(True, which="both", linestyle=":", linewidth="0.5", color="gray")
 
-        # Add and format the colorbar
-        cbar = fig.colorbar(scatter, ax=ax, pad=0.02)
+        # It will automatically use the labels, markers, and colors defined above.
+        # 'loc' places the legend in the best position to avoid data.
+        legend = ax.legend(loc="best", fontsize=12)
+        legend.get_frame().set_alpha(0.8)
+
+        # Create a ScalarMappable for the colorbar to ensure it reflects the full range of dates
+        mappable = cm.ScalarMappable(cmap=cmap, norm=norm)
+        cbar = fig.colorbar(mappable, ax=ax, pad=0.02)
+
         cbar.set_label("Survey Date", fontsize=12)
         tick_locs = cbar.get_ticks()
         cbar.ax.set_yticklabels(
