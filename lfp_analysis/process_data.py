@@ -4,7 +4,7 @@ import lfp_analysis.utils as utils
 from zoneinfo import ZoneInfo
 from datetime import time as dttime
 from datetime import timedelta, datetime, date
-import state_utils
+import lfp_analysis.state_utils as state_utils
 
 central_time = ZoneInfo('America/Chicago')
 def process_data(pt_name: str, raw_data: pd.DataFrame, patient_dict: dict):
