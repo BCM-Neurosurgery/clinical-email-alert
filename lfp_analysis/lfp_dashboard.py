@@ -1,11 +1,8 @@
-import numpy as np
-import pandas as pd
-import json
-from generate_raw import generate_raw
-from process_data import process_data
-from model_data import model_data
-from burdened_class_logreg import run_regression
-from plotting_funcs import plot_data
+from lfp_analysis.generate_raw import generate_raw
+from lfp_analysis.process_data import process_data
+from lfp_analysis.model_data import model_data
+from lfp_analysis.plotting_funcs import plot_data
+from trbdv0.constants import LFP_CONSTANTS
 
 
 # Main LFP configure function
@@ -18,33 +15,17 @@ def config_dash(pt_name: str, save_path: str = None):
         save_path (str, optional): The full path (including filename and extension)
                                    to save the static image. Defaults to None.
     """
-    # open trbd and ocd patient info jsons
-    if pt_name[0] == "T":
-        # It's good practice to use a more robust path handling mechanism
-        # For example, using os.path.join
-        json_path = "/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/trbd_patient_info.json"
-    elif pt_name[0] in ["A", "B"]:
-        json_path = (
-            "/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/ocd_patient_info.json"
-        )
-    else:
-        print("Patient not in the database!")
-        return None, None
-
     try:
-        with open(json_path, "r") as f:
-            pt_info = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: The file {json_path} was not found.")
+        raw_df, pt_changes_df = generate_raw(pt_name, LFP_CONSTANTS[pt_name])
+    except TypeError as e:
+        print(f"Error during data generation for patient {pt_name}: No Data - {e}.")
         return None, None
 
-    # Analyze LFP data for the patient
-    raw_df, pt_changes_df = generate_raw(pt_name, pt_info[pt_name])
-    processed_data = process_data(pt_name, raw_df, pt_info[pt_name])
+    processed_data = process_data(pt_name, raw_df, LFP_CONSTANTS[pt_name])
     df_w_preds = model_data(processed_data)
 
     # Plot data
-    fig = plot_data(pt_name, pt_info[pt_name], df_w_preds)
+    fig = plot_data(pt_name, LFP_CONSTANTS[pt_name], df_w_preds)
 
     # Save the figure if a save_path is provided
     if save_path:
@@ -63,9 +44,8 @@ def config_dash(pt_name: str, save_path: str = None):
 
 def main():
     pt_name = "TRBD001"
-    save_path = "/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/lfp_dashboard.png"
+    save_path = f"/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/lfp_dashboard_{pt_name}.png"
     df, fig = config_dash(pt_name, save_path=save_path)
-    fig.show()
 
 
 if __name__ == "__main__":

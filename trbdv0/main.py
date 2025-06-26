@@ -30,6 +30,7 @@ from trbdv0.survey_automation import send_survey, send_wearable_reminder
 import argparse
 import json
 from trbdv0.survey_processor import init_processor, ISSProcessor
+from lfp_analysis.lfp_dashboard import config_dash
 
 
 def main():
@@ -166,6 +167,21 @@ def main():
                 processor.plot_historical_scores(
                     output_filename=f"{patient}_{safe_survey_name}.png"
                 )
+
+        # Add LFP plot
+        lfp_plot_path = os.path.join(patient_out_dir, f"{patient}_lfp.png")
+        logger.info(f"Generating LFP analysis plot for {patient}...")
+        try:
+            df_w_preds, fig = config_dash(patient, save_path=lfp_plot_path)
+            if fig:
+                logger.info(f"LFP plot for {patient} created successfully.")
+            else:
+                logger.warning(f"LFP plot could not be generated for {patient}.")
+
+        except Exception as e:
+            logger.error(
+                f"An error occurred during LFP plot generation for {patient}: {e}"
+            )
 
         # get attachments
         attachments = get_attachments(patient_out_dir)
