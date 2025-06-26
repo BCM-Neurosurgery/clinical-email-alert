@@ -1,10 +1,8 @@
-import json
 from lfp_analysis.generate_raw import generate_raw
 from lfp_analysis.process_data import process_data
 from lfp_analysis.model_data import model_data
 from lfp_analysis.plotting_funcs import plot_data
-
-json_path = "/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/lfp_config.json"
+from trbdv0.constants import LFP_CONSTANTS
 
 
 # Main LFP configure function
@@ -18,23 +16,16 @@ def config_dash(pt_name: str, save_path: str = None):
                                    to save the static image. Defaults to None.
     """
     try:
-        with open(json_path, "r") as f:
-            pt_info = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: The file {json_path} was not found.")
-        return None, None
-
-    try:
-        raw_df, pt_changes_df = generate_raw(pt_name, pt_info[pt_name])
+        raw_df, pt_changes_df = generate_raw(pt_name, LFP_CONSTANTS[pt_name])
     except TypeError as e:
         print(f"Error during data generation for patient {pt_name}: No Data - {e}.")
         return None, None
 
-    processed_data = process_data(pt_name, raw_df, pt_info[pt_name])
+    processed_data = process_data(pt_name, raw_df, LFP_CONSTANTS[pt_name])
     df_w_preds = model_data(processed_data)
 
     # Plot data
-    fig = plot_data(pt_name, pt_info[pt_name], df_w_preds)
+    fig = plot_data(pt_name, LFP_CONSTANTS[pt_name], df_w_preds)
 
     # Save the figure if a save_path is provided
     if save_path:
@@ -52,7 +43,7 @@ def config_dash(pt_name: str, save_path: str = None):
 
 
 def main():
-    pt_name = "TRBD002"
+    pt_name = "TRBD001"
     save_path = f"/home/auto/CODE/trbd/TRBD-null-pipeline/lfp_analysis/lfp_dashboard_{pt_name}.png"
     df, fig = config_dash(pt_name, save_path=save_path)
 

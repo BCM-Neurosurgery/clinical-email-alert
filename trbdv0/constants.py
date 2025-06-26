@@ -66,3 +66,38 @@ HIGHLIGHT_KEYS = {
 # currently only include TRBD patients for
 # email qualtric survey
 ALLOWED_SURVEY_PATIENTS = {"TRBD001", "TRBD002"}
+
+# LFP related constants
+LFP_CONSTANTS = {
+    "009": {
+        "directory": "/mnt/datalake/data/PerceptOCD-48392/009/LFP/",
+        "dbs_date": "2020-08-11",
+        "response_status": 1,
+        "response_date": 241
+    },
+    "DBSOCD001": {
+        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD001/LFP/",
+        "dbs_date": "2025-01-28",
+        "response_status": 0
+    },
+    "DBSOCD002": {
+        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD002/LFP/",
+        "dbs_date": "2025-04-10",
+        "response_status": 0
+    },
+    "DBSOCD004": {
+        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD004/LFP/",
+        "dbs_date": "2025-04-10",
+        "response_status": 0
+    },
+    "TRBD001": {
+        "directory": "/mnt/datalake/data/TRBD-53761/TRBD001/LFP/",
+        "dbs_date": "2025-06-04",
+        "response_status": 0
+    },
+    "TRBD002": {
+        "directory": "/mnt/datalake/data/TRBD-53761/TRBD002/LFP/",
+        "dbs_date": "2025-07-09",
+        "response_status": 0
+    }
+}
