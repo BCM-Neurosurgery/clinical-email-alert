@@ -742,6 +742,49 @@ class Master:
 
         return sleep_hours
 
+    def compute_sleep_hours(self) -> pd.DataFrame:
+        """
+        Computes total sleep duration (in hours) for each unique day in the data.
+
+        This function processes the `self.plot_integrated_time` DataFrame. It groups
+        the data by `shifted_day`, calculates the total minutes spent in sleep states
+        (deep, light, REM), and converts this duration to hours.
+
+        Sleep includes 'deep_sleep', 'light_sleep', and 'REM_sleep' phases.
+
+        Returns:
+            pd.DataFrame: A DataFrame with three columns: 'Date', 'TimeRange', and
+                          'SleepHours'. Each row represents a unique day, its
+                          corresponding total sleep hours, and the 12pm-12pm time
+                          range. Returns an empty DataFrame if no sleep data is found.
+        """
+        df = self.plot_integrated_time
+        if df.empty or "in_bed" not in df.columns or "shifted_day" not in df.columns:
+            print(
+                "Input DataFrame is empty or missing required columns ('in_bed', 'shifted_day')."
+            )
+            return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
+
+        df = df.copy()
+        # Assign a state (e.g., 'deep_sleep', 'awake') to each minute/row
+        df["state"] = df.apply(self.assign_state, axis=1)
+        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+        sleep_df = df[df["state"].isin(sleep_states)]
+
+        if sleep_df.empty:
+            return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
+
+        # Group by day, count the number of minutes (rows), and store it
+        daily_sleep_minutes = sleep_df.groupby("shifted_day").size()
+        daily_sleep_hours = round(daily_sleep_minutes / 60.0, 2)
+        result_df = daily_sleep_hours.reset_index(name="SleepHours")
+        result_df.rename(columns={"shifted_day": "Date"}, inplace=True)
+        result_df["TimeRange"] = result_df["Date"].apply(
+            lambda d: f"{d.strftime('%Y-%m-%d')} 12:00 PM - {(d + pd.Timedelta(days=1)).strftime('%Y-%m-%d')} 12:00 PM"
+        )
+        result_df = result_df[["Date", "TimeRange", "SleepHours"]]
+        return result_df
+
     def compute_average_steps(self, offset: int = 12) -> int:
         """
         Computes the average daily step count from self.activity.steps.
