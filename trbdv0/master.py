@@ -776,7 +776,7 @@ class Master:
 
         # Group by day, count the number of minutes (rows), and store it
         daily_sleep_minutes = sleep_df.groupby("shifted_day").size()
-        daily_sleep_hours = round(daily_sleep_minutes / 60.0, 2)
+        daily_sleep_hours = daily_sleep_minutes / 60.0
         result_df = daily_sleep_hours.reset_index(name="SleepHours")
         result_df.rename(columns={"shifted_day": "Date"}, inplace=True)
         result_df["TimeRange"] = result_df["Date"].apply(
