@@ -190,20 +190,39 @@ def create_pdf_from_ordered_images(
     patient_id: str, report_date: str, ordered_image_files: list, output_path: str
 ):
     """
-    Creates a multi-page PDF from an ordered list of images, with one image per page.
+    Creates a multi-page PDF from an ordered list of images.
+
+    If an image filename contains "sleep_hours", it is placed on the same
+    page as the image that came before it. The function automatically
+    resizes the image pair to fit on one page.
 
     Args:
         patient_id (str): The ID of the patient for the report title.
         report_date (str): The date of the report for the header.
         ordered_image_files (list): An ORDERED list of full paths to the image files.
+                                    A "sleep_hours" image should directly follow the
+                                    "wearables" image it belongs to.
         output_path (str): The full path to save the output PDF file.
     """
-    pdf = FPDF()
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    for image_file in ordered_image_files:
-        if not os.path.exists(image_file):
-            print(f"[Warning] Image file not found, skipping: {image_file}")
+    # --- PDF Layout Constants (in mm) ---
+    A4_WIDTH, A4_HEIGHT = 210, 297
+    MARGIN = 15
+    USABLE_WIDTH = A4_WIDTH - 2 * MARGIN
+    USABLE_HEIGHT = A4_HEIGHT - 2 * MARGIN
+    HEADER_HEIGHT = 20  # Approximate height for title + line break
+    SPACE_BETWEEN_IMAGES = 5
+
+    # Use a while loop to have more control over the iteration
+    i = 0
+    while i < len(ordered_image_files):
+        main_image_file = ordered_image_files[i]
+
+        if not os.path.exists(main_image_file):
+            print(f"[Warning] Image file not found, skipping: {main_image_file}")
+            i += 1
             continue
 
         pdf.add_page()
@@ -211,12 +230,42 @@ def create_pdf_from_ordered_images(
         # --- Add a consistent header to each page ---
         pdf.set_font("Helvetica", "B", 14)
         pdf.cell(0, 10, f"Patient Report: {patient_id} - {report_date}", 0, 1, "C")
-        pdf.ln(10)
+        pdf.ln(10)  # Part of HEADER_HEIGHT
 
-        # --- Add the image, fitting it to the page width ---
-        # A4 page width is 210mm. With 10mm margins, usable width is 190mm.
-        # FPDF automatically maintains the aspect ratio when only width (w) is specified.
-        pdf.image(image_file, w=190)
+        # --- Look ahead to see if the next image is a sleep plot ---
+        is_paired = (
+            i + 1 < len(ordered_image_files)
+            and "sleep_hours" in ordered_image_files[i + 1]
+        )
+
+        if is_paired:
+            # --- Two-Image Page Logic ---
+            sleep_image_file = ordered_image_files[i + 1]
+            if not os.path.exists(sleep_image_file):
+                print(f"[Warning] Paired image not found, skipping: {sleep_image_file}")
+                # Fallback to printing just the main image
+                pdf.image(main_image_file, w=USABLE_WIDTH)
+                i += 1  # Only advance by one
+                continue
+
+            # Calculate height for each image to fit on the page
+            available_height = USABLE_HEIGHT - HEADER_HEIGHT - SPACE_BETWEEN_IMAGES
+            max_height_per_image = available_height / 2
+
+            # Add the first (wearables) image
+            pdf.image(main_image_file, w=USABLE_WIDTH, h=max_height_per_image)
+            pdf.ln(SPACE_BETWEEN_IMAGES)
+
+            # Add the second (sleep_hours) image
+            pdf.image(sleep_image_file, w=USABLE_WIDTH, h=max_height_per_image)
+
+            # Advance the loop by 2 since we processed a pair of images
+            i += 2
+        else:
+            # --- Single-Image Page Logic ---
+            pdf.image(main_image_file, w=USABLE_WIDTH)
+            # Advance the loop by 1
+            i += 1
 
     pdf.output(output_path)
-    print(f"Simple PDF report generated at: {output_path}")
+    print(f"PDF report with paired images generated at: {output_path}")

@@ -5,6 +5,7 @@ import pytz
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.dates as mdates
 from trbdv0.utils import (
     get_yesterdays_date,
     get_todays_date,
@@ -28,23 +29,32 @@ class Master:
         self.plot_save_path = os.path.join(
             self.sleep.patient_out_dir, f"{self.patient}_wearables.png"
         )
+        self.sleep_hours_plot = os.path.join(
+            self.sleep.patient_out_dir, f"{self.patient}_sleep_hours.png"
+        )
         self.patient = self.sleep.get_patient()
-        self.analysis_timegrid = self.build_time_grid(end_date="yesterday")
+        self.analysis_timegrid = self.build_time_grid(
+            num_past_days=self.sleep.num_past_days, end_date="yesterday"
+        )
         self.master_integrated_time = self.build_master_integrated_time(
             self.analysis_timegrid
         )
-        self.plot_timegrid = self.build_time_grid(end_date="today")
+        self.plot_timegrid = self.build_time_grid(
+            num_past_days=self.sleep.num_past_days + 1, end_date="today"
+        )
         self.plot_integrated_time = self.build_master_integrated_time(
             self.plot_timegrid
         )
 
     def build_time_grid(
-        self, offset: int = 12, end_date: str = "yesterday"
+        self, num_past_days: int, offset: int = 12, end_date: str = "yesterday"
     ) -> pd.DataFrame:
         """Builds a 1-minute resolution time grid from start_date to end_date (inclusive),
         with timestamps localized to the given timezone (e.g., America/Chicago).
 
         Args:
+            num_past_days (int):
+                Number of past days to include in the grid, starting from the end_date.
             offset (int):
                 Hour of day (0-23) at which each day's window begins (e.g., 12 for 12 PM).
             end_date (str):
@@ -81,7 +91,7 @@ class Master:
 
         # we need to get self.num_past_days + 1 days so that
         # we actually have self.num_past_days intervals
-        date_range = get_iter_dates(ref_date_str, self.sleep.num_past_days + 1)
+        date_range = get_iter_dates(ref_date_str, num_past_days + 1)
         start_date, end_date = date_range[0], date_range[-1]
 
         start_ts = pd.to_datetime(start_date).replace(hour=offset, minute=0, second=0)
@@ -784,6 +794,70 @@ class Master:
         )
         result_df = result_df[["Date", "TimeRange", "SleepHours"]]
         return result_df
+
+    def plot_daily_sleep_hours(self):
+        """
+        Generates and saves a plot of daily sleep hours with an average line.
+        This method computes the sleep data internally before plotting.
+        """
+        # Directly call the compute method to get the data
+        sleep_data_df = self.compute_sleep_hours()
+
+        if sleep_data_df.empty:
+            print("[Warning] Sleep data is empty. Cannot generate plot.")
+            return
+
+        # Ensure 'Date' is in datetime format for proper plotting
+        df = sleep_data_df.copy()
+        df["Date"] = pd.to_datetime(df["Date"])
+
+        avg_sleep = self.compute_average_sleep_hours()
+
+        fig, ax = plt.subplots(figsize=(12, 7))
+
+        # Plot daily sleep hours as a line with points
+        ax.plot(
+            df["Date"], df["SleepHours"], marker="o", linestyle="-", label="Daily Sleep"
+        )
+
+        ax.axhline(
+            y=avg_sleep,
+            color="r",
+            linestyle="--",
+            label=f"Average: {avg_sleep:.1f} hrs",
+        )
+
+        # Annotate each data point
+        for index, row in df.iterrows():
+            ax.text(
+                row["Date"],
+                row["SleepHours"] - 0.3,
+                f"{row['SleepHours']:.1f}",
+                ha="center",
+                va="top",
+                fontsize=9,
+                color="navy",
+            )
+
+        # --- Formatting the plot ---
+        ax.set_title("Daily Sleep Duration", fontsize=16)
+        ax.set_xlabel("Date", fontsize=12)
+        ax.set_ylabel("Sleep (Hours)", fontsize=12)
+        ax.legend()
+        ax.grid(True, which="both", linestyle="--", linewidth=0.5)
+
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+        fig.autofmt_xdate(rotation=45)
+
+        ax.set_ylim(
+            bottom=max(0, df["SleepHours"].min() - 1), top=df["SleepHours"].max() + 1
+        )
+
+        plt.tight_layout()
+        plt.savefig(self.sleep_hours_plot)
+        plt.close(fig)
+        print(f"Sleep plot generated at: {self.sleep_hours_plot}")
 
     def compute_average_steps(self, offset: int = 12) -> int:
         """

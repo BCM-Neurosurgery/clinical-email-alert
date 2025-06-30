@@ -135,6 +135,7 @@ def main():
             json.dump(patient_summary_stats, f, indent=4)
 
         master.plot_combined_sleep_and_met()
+        master.plot_daily_sleep_hours()
 
         pt_survey_strings = patient_surveys.get(patient, [])
         survey_plot_paths = []
@@ -193,9 +194,10 @@ def main():
 
         # Generate PDF report with ordered plots
         ordered_plots = []
-        sleep_plot_path = master.plot_save_path
-        if os.path.exists(sleep_plot_path):
-            ordered_plots.append(sleep_plot_path)
+        if os.path.exists(master.plot_save_path):
+            ordered_plots.append(master.plot_save_path)
+        if os.path.exists(master.sleep_hours_plot):
+            ordered_plots.append(master.sleep_hours_plot)
 
         ordered_plots.extend(survey_plot_paths)
 
