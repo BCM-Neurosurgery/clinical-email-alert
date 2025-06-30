@@ -447,6 +447,27 @@ class Master:
                         zorder=2,
                     )
 
+        # Annotate yesterday to indicate exclusion from analysis
+        yesterday = days[-1]
+        y = day_to_y[yesterday]
+        ax.axhspan(
+            y - 0.3,
+            y + 0.3,
+            facecolor="#cccccc",
+            alpha=0.15,
+            zorder=1,
+        )
+        ax.text(
+            12,
+            y,
+            "Excluded from analysis",
+            va="center",
+            ha="center",
+            fontsize=10,
+            color="red",
+            zorder=3,
+        )
+
         # Final formatting
         ax.set_xlim(0, 24)
         xticks = range(0, 25, 2)
@@ -608,6 +629,27 @@ class Master:
                         linewidth=0.2,
                         zorder=2,
                     )
+
+        # Annotate yesterday to indicate exclusion from analysis
+        yesterday = days[-1]
+        y = day_to_y[yesterday]
+        ax.axhspan(
+            y - 0.3,
+            y + 0.3,
+            facecolor="#cccccc",
+            alpha=0.15,
+            zorder=1,
+        )
+        ax.text(
+            12,
+            y,
+            "Excluded from analysis",
+            va="center",
+            ha="center",
+            fontsize=10,
+            color="red",
+            zorder=3,
+        )
 
         # Formatting
         ax.set_xlim(0, 24)
