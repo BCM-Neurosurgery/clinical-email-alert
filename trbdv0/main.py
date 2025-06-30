@@ -13,6 +13,7 @@ from trbdv0.utils import (
     get_todays_date,
     read_config,
     validate_config_keys,
+    create_pdf_from_ordered_images,
 )
 import os
 import logging
@@ -135,8 +136,8 @@ def main():
 
         master.plot_combined_sleep_and_met()
 
-        # TODO: initialize survey processors
         pt_survey_strings = patient_surveys.get(patient, [])
+        survey_plot_paths = []
         quatrics_results = {}
         for survey in pt_survey_strings:
             # check if survey class is defined
@@ -167,25 +168,59 @@ def main():
                 processor.plot_historical_scores(
                     output_filename=f"{patient}_{safe_survey_name}.png"
                 )
+                survey_plot_paths.append(
+                    os.path.join(patient_out_dir, f"{patient}_{safe_survey_name}.png")
+                )
 
         # Add LFP plot
         lfp_plot_path = os.path.join(patient_out_dir, f"{patient}_lfp.png")
-        logger.info(f"Generating LFP analysis plot for {patient}...")
-        try:
-            df_w_preds, fig = config_dash(patient, save_path=lfp_plot_path)
-            if fig:
-                logger.info(f"LFP plot for {patient} created successfully.")
-            else:
-                logger.warning(f"LFP plot could not be generated for {patient}.")
+        if os.path.exists(lfp_plot_path):
+            logger.info(f"LFP plot already exists for {patient}, skipping generation.")
+        else:
+            # Generate LFP analysis plot
+            logger.info(f"Generating LFP analysis plot for {patient}...")
+            try:
+                df_w_preds, fig = config_dash(patient, save_path=lfp_plot_path)
+                if fig:
+                    logger.info(f"LFP plot for {patient} created successfully.")
+                else:
+                    logger.warning(f"LFP plot could not be generated for {patient}.")
 
-        except Exception as e:
-            logger.error(
-                f"An error occurred during LFP plot generation for {patient}: {e}"
+            except Exception as e:
+                logger.error(
+                    f"An error occurred during LFP plot generation for {patient}: {e}"
+                )
+
+        # Generate PDF report with ordered plots
+        ordered_plots = []
+        sleep_plot_path = master.plot_save_path
+        if os.path.exists(sleep_plot_path):
+            ordered_plots.append(sleep_plot_path)
+
+        ordered_plots.extend(survey_plot_paths)
+
+        lfp_plot_path = os.path.join(patient_out_dir, f"{patient}_lfp.png")
+        if os.path.exists(lfp_plot_path):
+            ordered_plots.append(lfp_plot_path)
+
+        if ordered_plots:
+            pdf_report_path = os.path.join(
+                patient_out_dir, f"{patient}_{today_date}_report.pdf"
             )
-
-        # get attachments
-        attachments = get_attachments(patient_out_dir)
-        all_attachments.extend(attachments)
+            try:
+                create_pdf_from_ordered_images(
+                    patient, today_date, ordered_plots, pdf_report_path
+                )
+                all_attachments.append(pdf_report_path)
+                logger.info(f"Successfully created simple PDF report for {patient}.")
+            except Exception as e:
+                logger.error(f"Failed to create PDF report for {patient}: {e}")
+                logger.info("Attaching individual images as a fallback.")
+                all_attachments.extend(ordered_plots)
+        else:
+            logger.warning(
+                f"No images were generated for {patient}, so no report will be created."
+            )
 
         all_patient_stats.append(
             {

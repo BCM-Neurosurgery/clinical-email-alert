@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 import json
 import pytz
-
+from fpdf import FPDF
+import os
 
 PHASE_MAPPING = {
     "1": "Deep Sleep",
@@ -183,3 +184,39 @@ def validate_config_keys(config: dict) -> None:
 
     if missing_keys:
         raise KeyError(f"Missing required config keys: {', '.join(missing_keys)}")
+
+
+def create_pdf_from_ordered_images(
+    patient_id: str, report_date: str, ordered_image_files: list, output_path: str
+):
+    """
+    Creates a multi-page PDF from an ordered list of images, with one image per page.
+
+    Args:
+        patient_id (str): The ID of the patient for the report title.
+        report_date (str): The date of the report for the header.
+        ordered_image_files (list): An ORDERED list of full paths to the image files.
+        output_path (str): The full path to save the output PDF file.
+    """
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    for image_file in ordered_image_files:
+        if not os.path.exists(image_file):
+            print(f"[Warning] Image file not found, skipping: {image_file}")
+            continue
+
+        pdf.add_page()
+
+        # --- Add a consistent header to each page ---
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, f"Patient Report: {patient_id} - {report_date}", 0, 1, "C")
+        pdf.ln(10)
+
+        # --- Add the image, fitting it to the page width ---
+        # A4 page width is 210mm. With 10mm margins, usable width is 190mm.
+        # FPDF automatically maintains the aspect ratio when only width (w) is specified.
+        pdf.image(image_file, w=190)
+
+    pdf.output(output_path)
+    print(f"Simple PDF report generated at: {output_path}")
