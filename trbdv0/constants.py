@@ -43,10 +43,10 @@ MISSING_LASTDAY_SLEEP_COLUMN = "Missing Last Day Sleep"
 LASTDAY_SLEEP_COLUMN = "Sleep (12pm-12pm, Day-2 to Yesterday)"
 AVERAGE_SLEEP_COLUMN = "Average Sleep (h)"
 
-LASTDAY_STEPS_COLUMN = "Yesterday Steps"
+LASTDAY_STEPS_COLUMN = "Day-2 Steps"
 AVERAGE_STEPS_COLUMN = "Average Steps"
 
-LASTDAY_MET_COLUMN = "Yesterday Average MET"
+LASTDAY_MET_COLUMN = "Day-2 Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
 
 # a mapping of survey IDs to processor classes

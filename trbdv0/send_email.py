@@ -264,10 +264,10 @@ def generate_email_body(all_patient_stats: list) -> str:
         f"either <em>missing data</em>, sleep less than 6 hours, or values that deviate more than ±25% from the patient's average.<br>"
         f"<strong>Sleep (12pm-12pm, Day-2 to Yesterday)</strong> is calculated as the sleep duration from "
         f"<em>12:00 PM on {lastday}</em> to <em>12:00 PM on {yesterday}</em>.<br>"
-        f"<strong>Yesterday Steps</strong> is calculated as the step counts from "
-        f"<em>4:00 AM on {yesterday}</em> to <em>4:00 AM on {today}</em>.<br>"
-        f"<strong>Yesterday Average MET</strong> is calculated as the average MET score from "
-        f"<em>4:00 AM on {yesterday}</em> to <em>4:00 AM on {today}</em>."
+        f"<strong>Day-2 Steps</strong> is calculated as the step counts from "
+        f"<em>4:00 AM on {lastday}</em> to <em>4:00 AM on {yesterday}</em>.<br>"
+        f"<strong>Day-2 Average MET</strong> is calculated as the average MET score from "
+        f"<em>4:00 AM on {lastday}</em> to <em>4:00 AM on {yesterday}</em>."
         f"</p>"
     )
 
