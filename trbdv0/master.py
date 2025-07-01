@@ -811,6 +811,8 @@ class Master:
                           range. Returns an empty DataFrame if no sleep data is found.
         """
         df = self.plot_integrated_time
+        print(df)
+
         if df.empty or "in_bed" not in df.columns or "shifted_day" not in df.columns:
             print(
                 "Input DataFrame is empty or missing required columns ('in_bed', 'shifted_day')."
@@ -853,24 +855,66 @@ class Master:
         df = sleep_data_df.copy()
         df["Date"] = pd.to_datetime(df["Date"])
 
-        avg_sleep = self.compute_average_sleep_hours()
+        # Calculate yesterday's date
+        yesterday = (
+            datetime.now(tz=pytz.timezone(self.timezone)) - timedelta(days=1)
+        ).date()
+
+        # Filter out yesterday's data for average calculation
+        df_for_avg = df[df["Date"].dt.date != yesterday]
+        avg_sleep = df_for_avg["SleepHours"].mean()
 
         fig, ax = plt.subplots(figsize=(12, 7))
 
         # Plot daily sleep hours as a line with points
-        ax.plot(
-            df["Date"], df["SleepHours"], marker="o", linestyle="-", label="Daily Sleep"
-        )
+        # Separate plotting for yesterday's data if it exists
+        yesterday_data = df[df["Date"].dt.date == yesterday]
+        other_data = df[df["Date"].dt.date != yesterday]
+
+        if not other_data.empty:
+            ax.plot(
+                other_data["Date"],
+                other_data["SleepHours"],
+                marker="o",
+                linestyle="-",
+                label="Daily Sleep",
+                color="blue",  # Default color for other data
+            )
+
+        if not yesterday_data.empty:
+            ax.plot(
+                yesterday_data["Date"],
+                yesterday_data["SleepHours"],
+                marker="o",
+                linestyle="--",  # Use a different linestyle for distinction
+                label="Excluded from analysis",  # Label for the legend
+                color="lightgray",  # Lighter color
+                markersize=8,
+                markeredgecolor="darkgray",
+            )
+            # Annotate yesterday's point with both value and exclusion text
+            for index, row in yesterday_data.iterrows():
+                ax.text(
+                    row["Date"],
+                    row["SleepHours"]
+                    + 0.5,  # Adjust vertical position for the main annotation
+                    f"{row['SleepHours']:.1f} \n(Excluded from analysis)",  # Combine text
+                    ha="center",
+                    va="bottom",
+                    fontsize=10,
+                    color="darkgray",
+                    fontweight="bold",
+                )
 
         ax.axhline(
             y=avg_sleep,
             color="r",
             linestyle="--",
-            label=f"Average: {avg_sleep:.1f} hrs",
+            label=f"Average (Excl. Yesterday): {avg_sleep:.1f} hrs",
         )
 
-        # Annotate each data point
-        for index, row in df.iterrows():
+        # Annotate each data point (excluding yesterday's, as it's handled separately)
+        for index, row in other_data.iterrows():
             ax.text(
                 row["Date"],
                 row["SleepHours"] - 0.3,
@@ -894,6 +938,12 @@ class Master:
 
         ax.set_ylim(
             bottom=max(0, df["SleepHours"].min() - 1), top=df["SleepHours"].max() + 1
+        )
+        ax.set_xlim(
+            [
+                self.plot_integrated_time["shifted_day"].min(),
+                self.plot_integrated_time["shifted_day"].max(),
+            ]
         )
 
         plt.tight_layout()
