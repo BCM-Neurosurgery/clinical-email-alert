@@ -45,15 +45,15 @@ class EmailSender:
 
         if attachments:
             for file in attachments:
-                attachment = open(file, "rb")
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    "Content-Disposition",
-                    f"attachment; filename= {os.path.basename(file)}",
-                )
-                msg.attach(part)
+                with open(file, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        "Content-Disposition",
+                        f"attachment; filename= {os.path.basename(file)}",
+                    )
+                    msg.attach(part)
 
         try:
             self.server.sendmail(self.smtp_user, to_addrs, msg.as_string())
@@ -132,8 +132,8 @@ def generate_email_body(all_patient_stats: list) -> str:
     df_rows = []
     survey_rows = []
 
-    def style(val, *flags):
-        if pd.isna(val) or any(warnings.get(flag, False) for flag in flags):
+    def style(val, warnings_dict, *flags):
+        if pd.isna(val) or any(warnings_dict.get(flag, False) for flag in flags):
             return f'<span style="background-color: #ff5252">{val}</span>'
         return val
 
@@ -143,7 +143,7 @@ def generate_email_body(all_patient_stats: list) -> str:
 
         This will:
         1. Look up the raw score by `key` (e.g. "SC1", "SC0") in `sdict`.
-        2. Check `sdict["yesterday_warnings"]` for any True flags.
+        2. Check `sdict["latest_warnings"]` for any True flags.
         3. If any warning is True and `key` is in HIGHLIGHT_KEYS[survey_name], wrap the score
             in a red-background <span>.
         4. Append the survey's EndDate (date-only) in a lighter <small> tag on a new line.
@@ -153,7 +153,7 @@ def generate_email_body(all_patient_stats: list) -> str:
             sdict (dict): Survey result dict containing at least:
                         - the score under `key`
                         - "EndDate" (a datetime string)
-                        - "yesterday_warnings" (dict of str→bool)
+                        - "latest_warnings" (dict of str→bool)
             key (str): Subscale code, e.g. "SC1", "SC2", or "SC0".
             survey_name (str): One of "ISS", "PHQ-8", or "ASRM" to select highlight logic.
 
@@ -189,30 +189,36 @@ def generate_email_body(all_patient_stats: list) -> str:
                 PT_COLUMN: patient,
                 LASTDAY_SLEEP_COLUMN: style(
                     f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
+                    warnings,
                     LASTDAY_SLEEP_NAN,
                     LASTDAY_SLEEP_LESS_THAN_6,
                     SLEEP_VARIATION,
                 ),
                 AVERAGE_SLEEP_COLUMN: style(
                     f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
+                    warnings,
                     AVERAGE_SLEEP_NAN,
                 ),
                 LASTDAY_STEPS_COLUMN: style(
                     f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
+                    warnings,
                     # LASTDAY_STEPS_NAN,
                     # STEPS_VARIATION,
                 ),
                 AVERAGE_STEPS_COLUMN: style(
                     f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
+                    warnings,
                     # AVERAGE_STEPS_NAN,
                 ),
                 LASTDAY_MET_COLUMN: style(
                     f"{summary.get(LASTDAY_MET, np.nan):.2f}",
+                    warnings,
                     LASTDAY_MET_NAN,
                     MET_VARIATION,
                 ),
                 AVERAGE_MET_COLUMN: style(
                     f"{summary.get(AVERAGE_MET, np.nan):.2f}",
+                    warnings,
                     AVERAGE_MET_NAN,
                 ),
             }
