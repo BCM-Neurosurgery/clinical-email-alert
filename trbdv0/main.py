@@ -149,10 +149,19 @@ def main():
                 continue
 
             # check survey folder
-            survey_folder = os.path.join(input_dir, patient, "qualtrics", survey)
-            if not os.path.exists(survey_folder):
+            survey_folder = None
+            for d in input_dir:  # `input_dir` is a list, so we iterate through it
+                potential_survey_folder = os.path.join(d, patient, "qualtrics", survey)
+                if os.path.exists(potential_survey_folder):
+                    survey_folder = potential_survey_folder
+                    logger.info(
+                        f"Found survey folder for '{survey}' at: {survey_folder}"
+                    )
+                    break  # Exit the loop once the folder is found
+
+            if not survey_folder:
                 logger.warning(
-                    f"Survey folder {survey_folder} does not exist for {patient}."
+                    f"Survey folder for '{survey}' does not exist for {patient} in any of the specified input directories."
                 )
                 continue
 
