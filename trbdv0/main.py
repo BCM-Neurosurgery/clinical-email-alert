@@ -57,6 +57,7 @@ def main():
     output_dir = config["output_dir"]
     log_dir = config["log_dir"]
     email_recipients = config["email_recipients"]
+    secure_email_recipients = config["secure_email_recipients"]
     smtp_server = config["smtp_server"]
     smtp_port = config["smtp_port"]
     smtp_user = config["smtp_user"]
@@ -312,7 +313,7 @@ def main():
 
         try:
             email_sender.send_email(
-                email_recipients, secure_subject, secure_body, attachments=[]
+                secure_email_recipients, secure_subject, secure_body, attachments=[]
             )
             logger.info(
                 "Consolidated secure ISS free response email sent successfully."

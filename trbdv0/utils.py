@@ -168,6 +168,7 @@ def validate_config_keys(config: dict) -> None:
         "log_dir",
         "timezone",
         "email_recipients",
+        "secure_email_recipients",
         "smtp_server",
         "smtp_port",
         "smtp_user",
