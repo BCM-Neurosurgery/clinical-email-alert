@@ -87,12 +87,13 @@ def main():
 
     all_patient_stats = []
     all_attachments = []
+    all_free_responses = []  # To store all ISS free responses
 
     for patient in config["active_patients"]:
         # locate patient folder
         patient_in_dir = None
-        for input_dir in config["input_dir"]:
-            potential_dir = os.path.join(input_dir, patient, "oura")
+        for d in config["input_dir"]:
+            potential_dir = os.path.join(d, patient, "oura")
             if os.path.exists(potential_dir):
                 patient_in_dir = potential_dir
                 break
@@ -155,10 +156,28 @@ def main():
                 )
                 continue
 
-            # dynamically import the survey processor clas
+            # dynamically import the survey processor class
             processor = init_processor(
                 SURVEY_CLASSES[survey], patient, survey_folder, patient_out_dir
             )
+
+            # collect ISS free responses
+            if isinstance(processor, ISSProcessor):
+                logger.info(f"Checking for ISS free response for patient {patient}...")
+                try:
+                    free_response = processor.get_most_recent_free_response()
+                    if free_response and free_response.strip():
+                        logger.info(
+                            f"Found and stored ISS free response for {patient}."
+                        )
+                        all_free_responses.append(
+                            {"patient": patient, "response": free_response}
+                        )
+                    else:
+                        logger.info(f"No new ISS free response found for {patient}.")
+                except Exception as e:
+                    logger.error(f"Failed to get ISS free response for {patient}: {e}")
+
             quatrics_results[survey] = processor.get_latest_survey_results()
             if hasattr(processor, "plot_historical_scores"):
                 survey_name = processor.survey_id
@@ -234,11 +253,54 @@ def main():
 
         logger.info(f"Data for patient {patient} processed successfully!")
 
-    # send a single email to recepients
-    email_body = generate_email_body(all_patient_stats)
-    subject = generate_subject_line(all_patient_stats)
-    email_sender.send_email(email_recipients, subject, email_body, all_attachments)
-    logger.info(f"Email for patient(s) {config['active_patients']} sent successfully!")
+    # send a single combined email for all ISS free responses
+    if all_free_responses:
+        logger.info("Consolidating all ISS free responses into a single secure email.")
+
+        # Include patient IDs with responses in the subject line
+        patient_ids_with_responses = sorted(
+            [item["patient"] for item in all_free_responses]
+        )
+        patient_id_str = ", ".join(patient_ids_with_responses)
+        secure_subject = f"SECURE: ISS Free Responses for Patient(s) {patient_id_str}"
+
+        email_body_parts = [
+            f"This is an automated, secure notification.\n\n"
+            f"The most recent free-text responses from ISS surveys have been retrieved for the following patient(s):\n"
+        ]
+
+        for item in all_free_responses:
+            patient_id = item["patient"]
+            response_text = item["response"]
+            email_body_parts.append(
+                f'\n--- Patient: {patient_id} ---\n"{response_text}"\n'
+            )
+
+        secure_body = "".join(email_body_parts)
+
+        try:
+            email_sender.send_email(
+                email_recipients, secure_subject, secure_body, attachments=[]
+            )
+            logger.info(
+                "Consolidated secure ISS free response email sent successfully."
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to send consolidated secure ISS free response email: {e}"
+            )
+
+    # send the main daily report email
+    if all_patient_stats:
+        email_body = generate_email_body(all_patient_stats)
+        subject = generate_subject_line(all_patient_stats)
+        email_sender.send_email(email_recipients, subject, email_body, all_attachments)
+        logger.info(
+            f"Main daily report for patient(s) {config['active_patients']} sent successfully!"
+        )
+    else:
+        logger.warning("No patient data was processed, skipping final report email.")
+
     email_sender.disconnect()
 
 
