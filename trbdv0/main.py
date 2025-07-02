@@ -165,13 +165,13 @@ def main():
             if isinstance(processor, ISSProcessor):
                 logger.info(f"Checking for ISS free response for patient {patient}...")
                 try:
-                    free_response = processor.get_most_recent_free_response()
-                    if free_response and free_response.strip():
+                    free_response_data = processor.get_most_recent_free_response()
+                    if free_response_data:
                         logger.info(
                             f"Found and stored ISS free response for {patient}."
                         )
                         all_free_responses.append(
-                            {"patient": patient, "response": free_response}
+                            {"patient": patient, **free_response_data}
                         )
                     else:
                         logger.info(f"No new ISS free response found for {patient}.")
@@ -271,9 +271,18 @@ def main():
 
         for item in all_free_responses:
             patient_id = item["patient"]
-            response_text = item["response"]
+            response_text = item["response"] or "[No response entered]"
+            response_date_str = item["date"]
+            # Format date to be more readable, e.g., '2023-10-27'
+            if response_date_str:
+                response_date = datetime.strptime(
+                    response_date_str, "%Y-%m-%d %H:%M:%S"
+                ).strftime("%Y-%m-%d")
+            else:
+                response_date = "N/A"
+
             email_body_parts.append(
-                f'\n--- Patient: {patient_id} ---\n"{response_text}"\n'
+                f'\n--- Patient: {patient_id} (Response from: {response_date}) ---\n"{response_text}"\n'
             )
 
         secure_body = "".join(email_body_parts)
