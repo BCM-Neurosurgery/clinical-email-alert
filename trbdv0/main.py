@@ -32,6 +32,7 @@ import argparse
 import json
 from trbdv0.survey_processor import init_processor, ISSProcessor
 from lfp_analysis.lfp_dashboard import config_dash
+import html
 
 
 def main():
@@ -274,15 +275,17 @@ def main():
         secure_subject = f"SECURE: ISS Free Responses for Patient(s) {patient_id_str}"
 
         email_body_parts = [
-            f"This is an automated, secure notification.\n\n"
-            f"The most recent free-text responses from ISS surveys have been retrieved for the following patient(s):\n"
+            "<html><body style='font-family: sans-serif;'>"
+            "<p>This is an automated, secure notification.</p>"
+            "<p>The most recent free-text responses from ISS surveys have been retrieved for the following patient(s):</p>"
         ]
 
         for item in all_free_responses:
             patient_id = item["patient"]
-            response_text = item["response"] or "[No response entered]"
+            # Escape the response text to prevent any HTML characters in it from breaking the layout
+            response_text = html.escape(item["response"] or "[No response entered]")
             response_date_str = item["date"]
-            # Format date to be more readable, e.g., '2023-10-27'
+
             if response_date_str:
                 response_date = datetime.strptime(
                     response_date_str, "%Y-%m-%d %H:%M:%S"
@@ -290,10 +293,21 @@ def main():
             else:
                 response_date = "N/A"
 
-            email_body_parts.append(
-                f'\n--- Patient: {patient_id} (Response from: {response_date}) ---\n"{response_text}"\n'
+            # Using HTML for better formatting in email clients.
+            # Using inline styles for maximum compatibility.
+            response_html = (
+                f'<hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">'
+                f'<div style="font-size: 14px;">'
+                f'<p style="margin: 0; padding: 0;"><b>Patient:</b> {patient_id}</p>'
+                f'<p style="margin: 0; padding: 0;"><b>Response Date:</b> {response_date}</p>'
+                f'<blockquote style="margin: 15px 0 0 20px; padding-left: 15px; border-left: 3px solid #eee; color: #333; font-style: italic;">'
+                f'{response_text.replace(chr(10), "<br>")}'  # Replace newline characters with <br> tags
+                f"</blockquote>"
+                f"</div>"
             )
+            email_body_parts.append(response_html)
 
+        email_body_parts.append("</body></html>")
         secure_body = "".join(email_body_parts)
 
         try:
