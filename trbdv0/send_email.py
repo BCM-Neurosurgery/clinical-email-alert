@@ -27,6 +27,7 @@ class EmailSender:
         self.server = smtplib.SMTP(self.smtp_server, self.smtp_port)
         self.server.ehlo()
         self.server.starttls()
+        self.server.ehlo()
         self.server.login(self.smtp_user, self.smtp_password)
 
     def send_email(
