@@ -1,6 +1,12 @@
 ## TBRD-null-pipeline
-Repo to store the temporary minimal solution for alerting worrying sleep signs in out TBRD patients
+Pathfinder of clinical email monoriring and patient state alert system 
 
+## Citation
+
+```
+Tomasz M. Frączek, Yewen Zhou, Thomas P. Kutcher, Raphael A. Bechtold, Saipravallika Chamarthi, Nora Vanegas Arroyave, Wayne K. Goodman, Sameer A. Sheth, Jeffrey A. Herron, Nicole R. Provenza, 
+Automated Monitoring and Clinical Notifications of Patient State for Neuropsychiatric Neuromodulation Studies, IEEE EMBC 2025 Proceedings
+```
 
 ### Deploy to Elias
 ```
