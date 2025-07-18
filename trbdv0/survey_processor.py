@@ -336,41 +336,43 @@ class ISSProcessor(SurveyProcessor):
             "Depression": activation < 155 and well_being < 125,
         }
 
-    def get_most_recent_free_response(self) -> str:
+    def get_most_recent_free_response(self) -> Dict[str, Any]:
         """
-        Retrieves the free response text (from column "Q8") from the most recent ISS survey.
+        Retrieves the free response text (from column "Q8") and its date
+        from the most recent ISS survey.
 
         Returns:
-            str: The text content of the "Q8" column from the latest survey.
-                 Returns an empty string if no survey is found, the column is missing,
-                 or the response is empty.
+            Dict[str, Any]: A dictionary with 'response' and 'date' keys.
+                e.g. {'response': 'Feeling better today.', 'date': '2025-07-02 10:30:00'}
+                Returns {'response': "", 'date': None} if no survey is found or an error occurs.
         """
         try:
             latest_path = self.get_most_recent_survey_file()
         except ValueError:
             # This happens if no survey files are found at all.
-            return ""
+            return {"response": "", "date": None}
 
         try:
+            # Get the date from the survey file using the base class method
+            response_date = self.get_survey_filled_date(latest_path)
+
             df = pd.read_csv(latest_path)
 
+            response_text = ""
             if "Q8" not in df.columns:
                 print(f"Warning: 'Q8' column not found in {latest_path}")
-                return ""
-
-            if len(df) < 2:
+            elif len(df) < 2:
                 print(f"Warning: Not enough rows in {latest_path} to extract data.")
-                return ""
+            else:
+                response = df.iloc[1]["Q8"]
+                if not pd.isna(response):
+                    response_text = str(response)
 
-            response = df.iloc[1]["Q8"]
-            if pd.isna(response):
-                return ""
-
-            return str(response)
+            return {"response": response_text, "date": response_date}
 
         except Exception as e:
             print(f"Error processing free response from {latest_path}: {e}")
-            return ""
+            return {"response": "", "date": None}
 
     def plot_historical_scores(
         self,

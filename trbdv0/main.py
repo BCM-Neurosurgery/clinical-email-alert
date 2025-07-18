@@ -32,6 +32,7 @@ import argparse
 import json
 from trbdv0.survey_processor import init_processor, ISSProcessor
 from lfp_analysis.lfp_dashboard import config_dash
+import html
 
 
 def main():
@@ -56,8 +57,10 @@ def main():
     output_dir = config["output_dir"]
     log_dir = config["log_dir"]
     email_recipients = config["email_recipients"]
+    secure_email_recipients = config["secure_email_recipients"]
     smtp_server = config["smtp_server"]
     smtp_port = config["smtp_port"]
+    smtp_from = config["smtp_from"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     timezone = config["timezone"]
@@ -72,27 +75,29 @@ def main():
     # load quatrics config
     quatrics_config = read_config(quatrics_config_path)
 
-    # initialize email sender
-    email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
-    email_sender.connect()
-
     # initialize logger
     os.makedirs(log_dir, exist_ok=True)
     logger = setup_logger(
-        "oura-email-notification",
+        "email-alert-notification",
         os.path.join(log_dir, f"{timestamp}.log"),
         tz=timezone,
         level=logging.INFO,
     )
 
+    # initialize email sender
+    email_sender = EmailSender(
+        smtp_server, smtp_port, smtp_from, smtp_user, smtp_password, logger
+    )
+
     all_patient_stats = []
     all_attachments = []
+    all_free_responses = []  # To store all ISS free responses
 
     for patient in config["active_patients"]:
         # locate patient folder
         patient_in_dir = None
-        for input_dir in config["input_dir"]:
-            potential_dir = os.path.join(input_dir, patient, "oura")
+        for d in config["input_dir"]:
+            potential_dir = os.path.join(d, patient, "oura")
             if os.path.exists(potential_dir):
                 patient_in_dir = potential_dir
                 break
@@ -148,17 +153,44 @@ def main():
                 continue
 
             # check survey folder
-            survey_folder = os.path.join(input_dir, patient, "qualtrics", survey)
-            if not os.path.exists(survey_folder):
+            survey_folder = None
+            for d in input_dir:  # `input_dir` is a list, so we iterate through it
+                potential_survey_folder = os.path.join(d, patient, "qualtrics", survey)
+                if os.path.exists(potential_survey_folder):
+                    survey_folder = potential_survey_folder
+                    logger.info(
+                        f"Found survey folder for '{survey}' at: {survey_folder}"
+                    )
+                    break  # Exit the loop once the folder is found
+
+            if not survey_folder:
                 logger.warning(
-                    f"Survey folder {survey_folder} does not exist for {patient}."
+                    f"Survey folder for '{survey}' does not exist for {patient} in any of the specified input directories."
                 )
                 continue
 
-            # dynamically import the survey processor clas
+            # dynamically import the survey processor class
             processor = init_processor(
                 SURVEY_CLASSES[survey], patient, survey_folder, patient_out_dir
             )
+
+            # collect ISS free responses
+            if isinstance(processor, ISSProcessor):
+                logger.info(f"Checking for ISS free response for patient {patient}...")
+                try:
+                    free_response_data = processor.get_most_recent_free_response()
+                    if free_response_data:
+                        logger.info(
+                            f"Found and stored ISS free response for {patient}."
+                        )
+                        all_free_responses.append(
+                            {"patient": patient, **free_response_data}
+                        )
+                    else:
+                        logger.info(f"No new ISS free response found for {patient}.")
+                except Exception as e:
+                    logger.error(f"Failed to get ISS free response for {patient}: {e}")
+
             quatrics_results[survey] = processor.get_latest_survey_results()
             if hasattr(processor, "plot_historical_scores"):
                 survey_name = processor.survey_id
@@ -234,11 +266,69 @@ def main():
 
         logger.info(f"Data for patient {patient} processed successfully!")
 
-    # send a single email to recepients
-    email_body = generate_email_body(all_patient_stats)
-    subject = generate_subject_line(all_patient_stats)
-    email_sender.send_email(email_recipients, subject, email_body, all_attachments)
-    logger.info(f"Email for patient(s) {config['active_patients']} sent successfully!")
+    # send a single combined email for all ISS free responses
+    if all_free_responses:
+        logger.info("Consolidating all ISS free responses into a single secure email.")
+
+        # Include patient IDs with responses in the subject line
+        patient_ids_with_responses = sorted(
+            [item["patient"] for item in all_free_responses]
+        )
+        patient_id_str = ", ".join(patient_ids_with_responses)
+        secure_subject = f"SECURE: ISS Free Responses for Patient(s) {patient_id_str}"
+
+        email_body_parts = [
+            "<html><body style='font-family: sans-serif;'>"
+            "<p>This is an automated, secure notification.</p>"
+            "<p>The most recent free-text responses from ISS surveys have been retrieved for the following patient(s):</p>"
+        ]
+
+        for item in all_free_responses:
+            patient_id = item["patient"]
+            # Escape the response text to prevent any HTML characters in it from breaking the layout
+            response_text = html.escape(item["response"] or "[No response entered]")
+            response_date_str = item["date"]
+
+            if response_date_str:
+                response_date = datetime.strptime(
+                    response_date_str, "%Y-%m-%d %H:%M:%S"
+                ).strftime("%Y-%m-%d")
+            else:
+                response_date = "N/A"
+
+            # Using HTML for better formatting in email clients.
+            # Using inline styles for maximum compatibility.
+            response_html = (
+                f'<hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">'
+                f'<div style="font-size: 14px;">'
+                f'<p style="margin: 0; padding: 0;"><b>Patient:</b> {patient_id}</p>'
+                f'<p style="margin: 0; padding: 0;"><b>Response Date:</b> {response_date}</p>'
+                f'<blockquote style="margin: 15px 0 0 20px; padding-left: 15px; border-left: 3px solid #eee; color: #333; font-style: italic;">'
+                f'{response_text.replace(chr(10), "<br>")}'  # Replace newline characters with <br> tags
+                f"</blockquote>"
+                f"</div>"
+            )
+            email_body_parts.append(response_html)
+
+        email_body_parts.append("</body></html>")
+        secure_body = "".join(email_body_parts)
+
+        secure_status = email_sender.send_email(
+            secure_email_recipients, secure_subject, secure_body, attachments=[]
+        )
+        logger.info(secure_status)
+
+    # send the main daily report email
+    if all_patient_stats:
+        email_body = generate_email_body(all_patient_stats)
+        subject = generate_subject_line(all_patient_stats)
+        status = email_sender.send_email(
+            email_recipients, subject, email_body, all_attachments
+        )
+        logger.info(status)
+    else:
+        logger.warning("No patient data was processed, skipping final report email.")
+
     email_sender.disconnect()
 
 
