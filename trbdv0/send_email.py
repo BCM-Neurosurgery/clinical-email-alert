@@ -1,9 +1,8 @@
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from typing import List
+from email.message import EmailMessage
+from pathlib import Path
+from email.utils import make_msgid
+from typing import List, Optional
 import os
 import pandas as pd
 import numpy as np
@@ -16,12 +15,16 @@ from trbdv0.constants import *
 
 
 class EmailSender:
-    def __init__(self, smtp_server, smtp_port, smtp_user, smtp_password):
+    def __init__(
+        self, smtp_server, smtp_port, smpt_from, smtp_user, smtp_password, logger
+    ):
         self.smtp_server = smtp_server
         self.smtp_port = smtp_port
+        self.smtp_from = smpt_from
         self.smtp_user = smtp_user
         self.smtp_password = smtp_password
         self.server = None
+        self.logger = logger
 
     def connect(self):
         self.server = smtplib.SMTP(self.smtp_server, self.smtp_port)
@@ -29,37 +32,75 @@ class EmailSender:
         self.server.starttls()
         self.server.login(self.smtp_user, self.smtp_password)
 
+    def _ensure_connection(self) -> None:
+        """Ensures there is an active SMTP connection."""
+        if not self.server:
+            self.connect()
+
+    def _build_message(
+        self,
+        to_addrs: List[str],
+        subject: str,
+        body: str,
+        attachments: Optional[List[str]] = None,
+    ) -> EmailMessage:
+        """Constructs the EmailMessage with HTML body and optional attachments."""
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = self.smtp_from
+        msg["To"] = ", ".join(to_addrs)
+        msg.set_content(body, subtype="html")
+        msg["Message-ID"] = make_msgid()
+
+        if attachments:
+            for file_path in attachments:
+                path = Path(file_path)
+                if not path.exists():
+                    self.logger.warning(f"Attachment not found: {file_path}")
+                    continue
+                with open(path, "rb") as f:
+                    content = f.read()
+                maintype, subtype = ("application", "octet-stream")
+                msg.add_attachment(
+                    content, maintype=maintype, subtype=subtype, filename=path.name
+                )
+
+        return msg
+
     def send_email(
         self,
         to_addrs: List[str],
         subject: str,
         body: str,
-        attachments: List[str] = None,
-    ):
-        msg = MIMEMultipart()
-        msg["From"] = self.smtp_user
-        msg["To"] = ", ".join(to_addrs)
-        msg["Subject"] = subject
+        attachments: Optional[List[str]] = None,
+        retry: bool = True,
+    ) -> bool:
+        """
+        Sends an email, ensuring connection and retrying once on disconnect.
 
-        msg.attach(MIMEText(body, "html"))
-
-        if attachments:
-            for file in attachments:
-                with open(file, "rb") as attachment:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(attachment.read())
-                    encoders.encode_base64(part)
-                    part.add_header(
-                        "Content-Disposition",
-                        f"attachment; filename= {os.path.basename(file)}",
-                    )
-                    msg.attach(part)
+        Returns:
+            True if the message was accepted by the SMTP server, False otherwise.
+        """
+        self._ensure_connection()
+        msg = self._build_message(to_addrs, subject, body, attachments)
 
         try:
-            self.server.sendmail(self.smtp_user, to_addrs, msg.as_string())
-            return "Email sent successfully with attachments"
-        except Exception as e:
-            return f"Failed to send email: {str(e)}"
+            response = self.server.send_message(msg)
+            self.logger.info(f"Email accepted by SMTP server. Response: {response}")
+            return True
+        except smtplib.SMTPServerDisconnected:
+            self.logger.warning("SMTP server disconnected. Attempting to reconnect.")
+            self.disconnect()
+            if retry:
+                self.connect()
+                return self.send_email(
+                    to_addrs, subject, body, attachments, retry=False
+                )
+            self.logger.error("Failed to send email after reconnect.")
+            return False
+        except smtplib.SMTPException as e:
+            self.logger.error(f"SMTP error while sending email: {e}")
+            return False
 
     def disconnect(self):
         if self.server:

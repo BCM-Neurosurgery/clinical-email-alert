@@ -171,6 +171,7 @@ def validate_config_keys(config: dict) -> None:
         "secure_email_recipients",
         "smtp_server",
         "smtp_port",
+        "smtp_from",
         "smtp_user",
         "smtp_password",
         "past_days",

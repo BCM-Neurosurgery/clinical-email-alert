@@ -60,6 +60,7 @@ def main():
     secure_email_recipients = config["secure_email_recipients"]
     smtp_server = config["smtp_server"]
     smtp_port = config["smtp_port"]
+    smtp_from = config["smtp_from"]
     smtp_user = config["smtp_user"]
     smtp_password = config["smtp_password"]
     timezone = config["timezone"]
@@ -74,17 +75,18 @@ def main():
     # load quatrics config
     quatrics_config = read_config(quatrics_config_path)
 
-    # initialize email sender
-    email_sender = EmailSender(smtp_server, smtp_port, smtp_user, smtp_password)
-    email_sender.connect()
-
     # initialize logger
     os.makedirs(log_dir, exist_ok=True)
     logger = setup_logger(
-        "oura-email-notification",
+        "email-alert-notification",
         os.path.join(log_dir, f"{timestamp}.log"),
         tz=timezone,
         level=logging.INFO,
+    )
+
+    # initialize email sender
+    email_sender = EmailSender(
+        smtp_server, smtp_port, smtp_from, smtp_user, smtp_password, logger
     )
 
     all_patient_stats = []
@@ -311,26 +313,19 @@ def main():
         email_body_parts.append("</body></html>")
         secure_body = "".join(email_body_parts)
 
-        try:
-            email_sender.send_email(
-                secure_email_recipients, secure_subject, secure_body, attachments=[]
-            )
-            logger.info(
-                "Consolidated secure ISS free response email sent successfully."
-            )
-        except Exception as e:
-            logger.error(
-                f"Failed to send consolidated secure ISS free response email: {e}"
-            )
+        secure_status = email_sender.send_email(
+            secure_email_recipients, secure_subject, secure_body, attachments=[]
+        )
+        logger.info(secure_status)
 
     # send the main daily report email
     if all_patient_stats:
         email_body = generate_email_body(all_patient_stats)
         subject = generate_subject_line(all_patient_stats)
-        email_sender.send_email(email_recipients, subject, email_body, all_attachments)
-        logger.info(
-            f"Main daily report for patient(s) {config['active_patients']} sent successfully!"
+        status = email_sender.send_email(
+            email_recipients, subject, email_body, all_attachments
         )
+        logger.info(status)
     else:
         logger.warning("No patient data was processed, skipping final report email.")
 

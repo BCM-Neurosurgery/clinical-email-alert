@@ -811,7 +811,6 @@ class Master:
                           range. Returns an empty DataFrame if no sleep data is found.
         """
         df = self.plot_integrated_time
-        print(df)
 
         if df.empty or "in_bed" not in df.columns or "shifted_day" not in df.columns:
             print(
