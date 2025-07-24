@@ -75,18 +75,18 @@ LFP_CONSTANTS = {
         "response_status": 1,
         "response_date": 241,
     },
-    "DBSOCD001": {
-        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD001/LFP/",
+    "AA001": {
+        "directory": "/mnt/datalake/data/AA-56119/AA001/LFP/",
         "dbs_date": "2025-01-28",
         "response_status": 0,
     },
-    "DBSOCD002": {
-        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD002/LFP/",
+    "AA002": {
+        "directory": "/mnt/datalake/data/AA-56119/AA002/LFP/",
         "dbs_date": "2025-04-10",
         "response_status": 0,
     },
-    "DBSOCD004": {
-        "directory": "/mnt/datalake/data/DBSPsych-56119/DBSOCD004/LFP/",
+    "AA004": {
+        "directory": "/mnt/datalake/data/AA-56119/AA004/LFP/",
         "dbs_date": "2025-04-10",
         "response_status": 0,
     },
