@@ -87,7 +87,7 @@ LFP_CONSTANTS = {
     },
     "AA004": {
         "directory": "/mnt/datalake/data/AA-56119/AA004/LFP/",
-        "dbs_date": "2025-04-10",
+        "dbs_date": "2025-06-12",
         "response_status": 0,
     },
     "TRBD001": {
