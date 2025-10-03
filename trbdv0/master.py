@@ -111,48 +111,67 @@ class Master:
     def build_master_sleep_bedtimes(self) -> pd.DataFrame:
         """Builds a master sleep timeline with 1-minute resolution from sleep bedtimes.
 
-        For each sleep segment, generates 1-minute timestamps from bedtime_start to bedtime_end,
-        normalized to America/Chicago timezone, and associates each segment with the day
-        defined as bedtime_start.date().
+        The function normalizes each bedtime start/end to the local timezone, compiles
+        the intervals, and emits a single row per minute. When overlapping bedtime
+        records occur (e.g., duplicate uploads), the earliest interval seen for a
+        given minute wins so downstream merges do not double-count time in bed.
 
         Returns:
             pd.DataFrame: DataFrame with columns:
-                - timestamp: 1-minute timestamps from bedtime_start to bedtime_end
+                - timestamp: unique 1-minute timestamps between bedtime_start and bedtime_end
                 - source: 'sleep'
         """
         tz = pytz.timezone(self.timezone)
-        all_rows = []
+        minute_rows = []
+        seen_minutes = set()  # avoid duplicate timestamps from overlapping bedtimes
 
+        bedtime_entries = []
         for entry in self.sleep.get_bedtimes():
             start = pd.to_datetime(
                 entry.get("bedtime_start"), errors="coerce", utc=True
             )
             end = pd.to_datetime(entry.get("bedtime_end"), errors="coerce", utc=True)
 
-            # Skip if invalid
             if pd.isna(start) or pd.isna(end):
                 continue
 
-            # Floor to mins so we can merge with
-            # timeline later with no errors
             start = start.tz_convert(tz).floor("min")
             end = end.tz_convert(tz).ceil("min")
 
-            # Generate 1-minute timestamps
-            timestamps = pd.date_range(
+            if start >= end:
+                continue
+
+            bedtime_entries.append((start, end))
+
+        if not bedtime_entries:
+            return pd.DataFrame()
+
+        bedtime_entries.sort(
+            key=lambda item: (item[0], -(item[1] - item[0]).total_seconds())
+        )
+
+        for start, end in bedtime_entries:
+            for ts in pd.date_range(
                 start=start, end=end, freq="1min", inclusive="left"
-            )
+            ):
+                if ts in seen_minutes:
+                    continue
+                seen_minutes.add(ts)
+                minute_rows.append({"timestamp": ts, "source": "sleep"})
 
-            all_rows.extend([{"timestamp": ts, "source": "sleep"} for ts in timestamps])
-
-        return pd.DataFrame(all_rows)
+        return pd.DataFrame(minute_rows)
 
     def build_master_sleep_phases(self) -> pd.DataFrame:
-        """Builds a 1-minute resolution DataFrame of sleep phases from all sleep data entries.
+        """Builds a 1-minute resolution DataFrame of sleep phases.
+
+        Sleep entries are normalized to the local timezone and expanded into 1-minute
+        rows per phase bucket. When different records cover the same minute, the first
+        entry processed retains ownership of that timestamp, ensuring a single
+        sleep phase per minute in the master timeline.
 
         Returns:
             pd.DataFrame: DataFrame with columns:
-                - timestamp: 1-min resolution timestamps during sleep
+                - timestamp: unique 1-minute timestamps during sleep
                 - phase: int code (1=deep, 2=light, 3=REM, 4=awake)
                 - phase_label: human-readable sleep phase
                 - source: 'sleep_phase'
@@ -161,6 +180,9 @@ class Master:
         phase_map = {"1": "deep", "2": "light", "3": "REM", "4": "awake"}
 
         all_rows = []
+        seen_minutes = set()  # keep only the first phase recorded for each minute
+
+        phase_entries = []
 
         for entry in self.sleep.sleep_data:
             phase_string = entry.get("sleep_phase_5_min")
@@ -177,17 +199,28 @@ class Master:
                 self.logger.warning(f"Invalid bedtime_start: {start_str} — {e}")
                 continue
 
+            duration = len(phase_string) * 5
+            phase_entries.append((start_time, duration, phase_string))
+
+        if not phase_entries:
+            return pd.DataFrame()
+
+        phase_entries.sort(key=lambda item: (item[0], -item[1]))
+
+        for start_time, duration_minutes, phase_string in phase_entries:
             for i, char in enumerate(phase_string):
                 if char not in phase_map:
-                    continue  # skip unknown characters
+                    continue
 
                 phase = int(char)
                 label = phase_map[char]
                 segment_start = start_time + timedelta(minutes=5 * i)
 
-                # Create 5 one-minute timestamps per phase block
                 for j in range(5):
                     ts = segment_start + timedelta(minutes=j)
+                    if ts in seen_minutes:
+                        continue
+                    seen_minutes.add(ts)
                     all_rows.append(
                         {
                             "timestamp": ts,
