@@ -1148,6 +1148,13 @@ class Master:
 
         return int(df_lastday["non_wear_time"].sum())
 
+    def get_lastday_sleep_score(self) -> float:
+        """
+        Returns the daily sleep score for last day (day before yesterday).
+        """
+        lastday = get_last_day()
+        return self.sleep.get_daily_sleep_score(lastday)
+
     def get_summary_stats(self) -> dict:
         """
         Returns a dictionary of daily summary statistics
@@ -1162,6 +1169,7 @@ class Master:
             LASTDAY_DATE: get_last_day(),
             AVERAGE_SLEEP_HOURS: self.compute_average_sleep_hours(),
             LASTDAY_SLEEP_HOURS: self.compute_lastday_sleep_hours(),
+            LASTDAY_SLEEP_SCORE: self.get_lastday_sleep_score(),
             LASTDAY_NON_WEAR_TIME_S: self.get_last_non_wear_time(),
             AVERAGE_STEPS: self.compute_average_steps(),
             LASTDAY_STEPS: self.compute_lastday_steps(),
@@ -1190,9 +1198,11 @@ class Master:
         avg_met = summary.get(AVERAGE_MET)
         nan_sleep_days = summary.get(NUMBER_OF_NANSLEEP_DAYS)
         l_non_wear_time = summary.get(LASTDAY_NON_WEAR_TIME_S)
+        l_sleep_score = summary.get(LASTDAY_SLEEP_SCORE)
 
         return {
             LASTDAY_SLEEP_NAN: pd.isna(l_sleep),
+            LASTDAY_SLEEP_SCORE_NAN: pd.isna(l_sleep_score),
             # LASTDAY_STEPS_NAN: pd.isna(l_steps),
             LASTDAY_MET_NAN: pd.isna(l_met),
             AVERAGE_SLEEP_NAN: pd.isna(avg_sleep),

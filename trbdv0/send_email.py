@@ -236,6 +236,11 @@ def generate_email_body(all_patient_stats: list) -> str:
                     LASTDAY_SLEEP_LESS_THAN_6,
                     SLEEP_VARIATION,
                 ),
+                LASTDAY_SLEEP_SCORE_COLUMN: style(
+                    f"{summary.get(LASTDAY_SLEEP_SCORE, np.nan):.0f}",
+                    warnings,
+                    LASTDAY_SLEEP_SCORE_NAN,
+                ),
                 AVERAGE_SLEEP_COLUMN: style(
                     f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
                     warnings,

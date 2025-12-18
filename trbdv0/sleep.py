@@ -70,6 +70,54 @@ class Sleep:
     def get_sleep_data(self):
         return self.sleep_data
 
+    def get_daily_sleep_score(self, date_str: str) -> float:
+        """Returns the daily sleep score for a specific date.
+
+        Args:
+            date_str (str): Date string in "YYYY-MM-DD" format.
+
+        Returns:
+            float: Sleep score or np.nan if not found.
+        """
+        daily_sleep_path = os.path.join(
+            self.patient_in_dir, date_str, "daily_sleep.json"
+        )
+
+        if not os.path.exists(daily_sleep_path):
+            self.logger.error(f"{date_str} daily_sleep.json not found.")
+            return np.nan
+
+        try:
+            daily_sleep_data = read_json(daily_sleep_path)
+        except Exception as e:
+            self.logger.error(f"Failed to read daily_sleep.json for {date_str}: {e}")
+            return np.nan
+
+        if not daily_sleep_data:
+            return np.nan
+
+        entries = (
+            daily_sleep_data
+            if isinstance(daily_sleep_data, list)
+            else [daily_sleep_data]
+        )
+
+        for entry in entries:
+            if entry.get("day") == date_str and entry.get("score") is not None:
+                try:
+                    return float(entry.get("score"))
+                except (TypeError, ValueError):
+                    return np.nan
+
+        for entry in entries:
+            if entry.get("score") is not None:
+                try:
+                    return float(entry.get("score"))
+                except (TypeError, ValueError):
+                    return np.nan
+
+        return np.nan
+
     def ingest(self):
         """Ingests sleep data for a range of past dates.
 
