@@ -7,6 +7,7 @@ LASTDAY_DATE = "lastday_date"
 LASTDAY_SLEEP_HOURS = "lastday_sleep_hours"
 AVERAGE_SLEEP_HOURS = "average_sleep_hours"
 LASTDAY_SLEEP_SCORE = "lastday_sleep_score"
+AVERAGE_SLEEP_SCORE = "average_sleep_score"
 
 LASTDAY_NON_WEAR_TIME_S = "lastday_non_wear_time_s"
 
@@ -27,6 +28,7 @@ HAS_NAN_SLEEP_DAYS = "has_nansleep_days"
 LASTDAY_SLEEP_LESS_THAN_6 = "lastday_sleep_less_than_6"
 SLEEP_VARIATION = "sleep_variation"
 LASTDAY_SLEEP_SCORE_NAN = "lastday_sleep_score_nan"
+AVERAGE_SLEEP_SCORE_NAN = "average_sleep_score_nan"
 
 LASTDAY_STEPS_NAN = "lastday_steps_nan"
 AVERAGE_STEPS_NAN = "average_steps_nan"
@@ -45,6 +47,7 @@ MISSING_LASTDAY_SLEEP_COLUMN = "Missing Last Day Sleep"
 LASTDAY_SLEEP_COLUMN = "Sleep (12pm-12pm, Day-2 to Yesterday)"
 LASTDAY_SLEEP_SCORE_COLUMN = "Daily Sleep Score"
 AVERAGE_SLEEP_COLUMN = "Average Sleep (h)"
+AVERAGE_SLEEP_SCORE_COLUMN = "Average Sleep Score"
 
 LASTDAY_STEPS_COLUMN = "Day-2 Steps"
 AVERAGE_STEPS_COLUMN = "Average Steps"

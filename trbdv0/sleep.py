@@ -7,6 +7,7 @@ from trbdv0.utils import (
     get_past_dates,
     read_json,
     get_iter_dates,
+    get_last_day,
 )
 import pytz
 
@@ -117,6 +118,21 @@ class Sleep:
                     return np.nan
 
         return np.nan
+
+    def get_average_sleep_score(self) -> float:
+        """Returns the average daily sleep score for the master analysis window."""
+        end_date = get_last_day()
+        date_list = get_iter_dates(end_date, self.num_past_days)
+        scores = []
+        for date_str in date_list:
+            score = self.get_daily_sleep_score(date_str)
+            if not pd.isna(score):
+                scores.append(score)
+
+        if not scores:
+            return np.nan
+
+        return float(np.mean(scores))
 
     def ingest(self):
         """Ingests sleep data for a range of past dates.
