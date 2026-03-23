@@ -154,6 +154,7 @@ class Sleep:
         """
         self.sleep_data = []
         self.bedtimes = []
+        seen_bedtimes = set()
 
         for date in self.iter_past_dates:
             patient_date_json = os.path.join(self.patient_in_dir, date, "sleep.json")
@@ -169,10 +170,23 @@ class Sleep:
                 continue
 
             for sleep_entry in sleep_data:
+                bt_start = sleep_entry.get("bedtime_start", np.nan)
+                bt_end = sleep_entry.get("bedtime_end", np.nan)
+
+                # Skip duplicate sleep entries (Oura API bug)
+                key = (bt_start, bt_end)
+                if key in seen_bedtimes:
+                    self.logger.warning(
+                        f"Skipping duplicate sleep entry for {date}: "
+                        f"{bt_start} -> {bt_end}"
+                    )
+                    continue
+                seen_bedtimes.add(key)
+
                 entry = {
                     "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", np.nan),
-                    "bedtime_start": sleep_entry.get("bedtime_start", np.nan),
-                    "bedtime_end": sleep_entry.get("bedtime_end", np.nan),
+                    "bedtime_start": bt_start,
+                    "bedtime_end": bt_end,
                     "total_sleep_duration": sleep_entry.get(
                         "total_sleep_duration", np.nan
                     ),
