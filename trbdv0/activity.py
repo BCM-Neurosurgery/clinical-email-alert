@@ -71,6 +71,7 @@ class Activity:
         self.met = []
         self.steps = []
         self.nonweartime = []
+        seen_days = {}  # day -> index into lists above
 
         for date in self.iter_past_dates:
             patient_date_json = os.path.join(
@@ -117,6 +118,30 @@ class Activity:
                     "timestamp": activity_entry.get("timestamp", np.nan),
                     "met": met,
                 }
+
+                day = activity_entry.get("day")
+
+                # Deduplicate by day — keep the later entry (Oura API bug)
+                if day in seen_days:
+                    idx = seen_days[day]
+                    self.logger.warning(f"Replacing duplicate activity entry for {day}")
+                    self.activity_data[idx] = entry
+                    self.met[idx] = entry["met"]
+                    self.activity_phases[idx] = {
+                        "class_5_min": entry["class_5_min"],
+                        "timestamp": entry["timestamp"],
+                    }
+                    self.steps[idx] = {
+                        "steps": entry["steps"],
+                        "timestamp": entry["timestamp"],
+                    }
+                    self.nonweartime[idx] = {
+                        "non_wear_time": entry["non_wear_time"],
+                        "timestamp": entry["timestamp"],
+                    }
+                    continue
+
+                seen_days[day] = len(self.activity_data)
 
                 self.activity_data.append(entry)
 
