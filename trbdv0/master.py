@@ -480,7 +480,8 @@ class Master:
                         zorder=2,
                     )
 
-        # Estimated rest underbar (MET < 1.2, not NaN)
+        # Estimated rest underbar (0.1 < MET < 1.2)
+        # Excludes MET <= 0.1 which indicates non-wear, not rest
         rest_color = "#90EE90"  # light green
         for day in days:
             day_df = df[df["shifted_day"] == day].copy()
@@ -489,7 +490,11 @@ class Master:
             if "met" not in day_df.columns:
                 continue
 
-            rest_df = day_df[day_df["met"].notna() & (day_df["met"] < MET_REST_THRESHOLD)]
+            rest_df = day_df[
+                day_df["met"].notna()
+                & (day_df["met"] > 0.1)
+                & (day_df["met"] < MET_REST_THRESHOLD)
+            ]
 
             if rest_df.empty:
                 continue
@@ -497,14 +502,14 @@ class Master:
             segments = self.get_segments(rest_df)
             for start, end in segments:
                 ax.barh(
-                    y=day_to_y[day] - 0.3,
+                    y=day_to_y[day] - 0.35,
                     width=end - start,
                     left=start,
-                    height=0.15,
+                    height=0.25,
                     color=rest_color,
-                    alpha=0.4 if is_yesterday else 0.7,
-                    edgecolor="none",
-                    linewidth=0,
+                    alpha=0.4 if is_yesterday else 0.85,
+                    edgecolor="#5CBF5C",
+                    linewidth=0.3,
                     zorder=1.5,
                 )
 
