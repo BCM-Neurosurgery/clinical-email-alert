@@ -26,6 +26,7 @@ Shows in-bed periods only. Each minute during in-bed is classified by `assign_st
 
 | State | Condition | Color |
 |-------|-----------|-------|
+| Oura bug | `met_is_bug == True` (MET 0.9 bug was cleaned for this minute) | Orange (#ff9800), hatched |
 | Not worn / battery dead | `activity_class == 0` OR `MET is NaN` OR `MET <= 0.1` | Gray (#aaaaaa), hatched |
 | Deep sleep | `sleep_phase_label == "deep"` | Dark blue (#0b3d91) |
 | Light sleep | `sleep_phase_label == "light"` | Medium blue (#3c82e0) |
@@ -41,14 +42,16 @@ A thin green bar drawn below each day's sleep bar showing periods of low MET act
 
 | | Criterion |
 |---|-----------|
-| **Condition** | `MET > 0.1` AND `MET < 1.2` AND `MET is not NaN` |
-| **Color** | Light green (#90EE90), alpha 0.7 (0.4 for yesterday) |
-| **Position** | Thin bar (height 0.15) below the main sleep bar |
+| **Condition** | `MET > 0.1` AND `MET < 1.1` AND `MET is not NaN` |
+| **Minimum duration** | Segments shorter than 10 minutes are filtered out to remove speckles |
+| **Color** | Light green (#90EE90), alpha 0.85 (0.4 for yesterday) |
+| **Position** | Thin bar (height 0.25) below the main sleep bar |
 | **Purpose** | Shows rest periods inferred from MET so clinicians can cross-reference with sleep data |
 
 - MET <= 0.1 is excluded (indicates non-wear, not rest)
 - NaN MET is excluded (no data or cleaned MET 0.9 bug)
-- Threshold constant: `MET_REST_THRESHOLD = 1.2`
+- Threshold constant: `MET_REST_THRESHOLD = 1.1`
+- Duration constant: `MET_REST_MIN_DURATION_MIN = 10`
 
 ---
 
@@ -58,7 +61,8 @@ Shows MET values for all time (not just in-bed). Each minute is bucketed by `buc
 
 | Bucket | Condition | Color |
 |--------|-----------|-------|
-| Non worn / battery dead | `MET is NaN` OR `MET <= 0.1` | Gray (#aaaaaa) |
+| Oura bug | `met_is_bug == True` | Orange (#ff9800), hatched |
+| Non worn / battery dead | `MET is NaN` OR `MET <= 0.1` | Gray (#aaaaaa), hatched |
 | 0.1 - 0.5 | `0.1 < MET < 0.5` | Very light blue (#deebf7) |
 | 0.5 - 1.0 | `0.5 <= MET < 1.0` | Light blue (#9ecae1) |
 | 1.0 - 2.0 | `1.0 <= MET < 2.0` | Medium blue (#6baed6) |
@@ -97,12 +101,12 @@ A cell is highlighted red (`#ff5252`) if any of its associated warning flags are
 
 ## Email Table: Inactive Patient Styling
 
-Configured via `inactive_patients` list in config.json (optional, defaults to `[]`).
+Configured via `inactive_patients` dict in config.json (optional, defaults to `{}`). Keys are patient IDs, values are the date they were marked inactive (e.g., `{"TRBD003": "2026-04-06"}`).
 
 | Condition | Styling |
 |-----------|---------|
 | Inactive + no lastday data (sleep and MET both NaN) | Gray text (#999999), no red highlighting |
-| Inactive + has lastday data (sleep or MET is non-NaN) | Blue background (#64B5F6), white text |
+| Inactive + has lastday data AFTER inactive date (sleep or MET is non-NaN, and lastday > inactive_since) | Blue background (#64B5F6), white text |
 | Active | Normal behavior (red on warning) |
 
 - Inactive patients are labeled "(inactive)" in the Patient column

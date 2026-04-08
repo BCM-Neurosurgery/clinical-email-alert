@@ -589,7 +589,7 @@ class Master:
             mpatches.Patch(
                 facecolor=rest_color,
                 alpha=0.7,
-                label="Estimated rest (MET < 1.2)",
+                label=f"Estimated rest (MET < {MET_REST_THRESHOLD})",
             )
         )
         ax.legend(
