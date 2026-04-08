@@ -46,7 +46,8 @@ MET_09_BUG_DETECTED = "met_09_bug_detected"
 MET_09_BUG_DATES = "met_09_bug_dates"
 
 # MET-inferred rest threshold
-MET_REST_THRESHOLD = 1.2
+MET_REST_THRESHOLD = 1.3
+MET_REST_MIN_DURATION_MIN = 10  # minimum rest segment duration in minutes
 
 # inactive patient status
 IS_INACTIVE = "is_inactive"

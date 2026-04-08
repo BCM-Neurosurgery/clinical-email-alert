@@ -114,9 +114,12 @@ class Activity:
                         met["items"] = met_items[:valid_len_min]
 
                 # Detect and clean MET 0.9 bug (long consecutive runs)
+                met_bug_mask = None
                 if met and met.get("items"):
-                    met["items"], bug_detected = self._detect_and_clean_met_09_bug(
-                        met["items"], MET_09_CONSECUTIVE_THRESHOLD_MIN
+                    met["items"], met_bug_mask, bug_detected = (
+                        self._detect_and_clean_met_09_bug(
+                            met["items"], MET_09_CONSECUTIVE_THRESHOLD_MIN
+                        )
                     )
                     if bug_detected:
                         bug_day = activity_entry.get("day", date)
@@ -132,6 +135,7 @@ class Activity:
                     "steps": activity_entry.get("steps", np.nan),
                     "timestamp": activity_entry.get("timestamp", np.nan),
                     "met": met,
+                    "met_bug_mask": met_bug_mask,
                 }
 
                 day = activity_entry.get("day")
@@ -197,10 +201,12 @@ class Activity:
             threshold_minutes: Minimum consecutive 0.9 run length to flag as bug.
 
         Returns:
-            (cleaned_items, bug_detected): Items with buggy runs replaced by NaN.
+            (cleaned_items, bug_mask, bug_detected): Items with buggy runs
+            replaced by NaN, boolean mask of cleaned indices, and detection flag.
         """
         bug_detected = False
         cleaned = list(met_items)
+        bug_mask = [False] * len(met_items)
 
         # Find all consecutive runs of exactly 0.9
         run_start = None
@@ -212,6 +218,7 @@ class Activity:
                 if run_start is not None and (i - run_start) >= threshold_minutes:
                     for j in range(run_start, i):
                         cleaned[j] = float("nan")
+                        bug_mask[j] = True
                     bug_detected = True
                 run_start = None
 
@@ -219,6 +226,7 @@ class Activity:
         if run_start is not None and (len(cleaned) - run_start) >= threshold_minutes:
             for j in range(run_start, len(cleaned)):
                 cleaned[j] = float("nan")
+                bug_mask[j] = True
             bug_detected = True
 
-        return cleaned, bug_detected
+        return cleaned, bug_mask, bug_detected

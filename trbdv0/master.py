@@ -297,15 +297,21 @@ class Master:
             pd.DataFrame: DataFrame with columns:
                 - timestamp: Timestamp for each MET reading
                 - met: MET value (float)
+                - met_is_bug: True if this minute was cleaned by MET 0.9 bug detection
                 - source: 'met'
         """
         tz = pytz.timezone(self.timezone)
         all_dfs = []
 
-        for entry in self.activity.met:
+        for activity_entry in self.activity.activity_data:
+            entry = activity_entry.get("met")
+            if not entry:
+                continue
+
             interval_sec = entry.get("interval", 60)
             met_values = entry.get("items")
             start_str = entry.get("timestamp")
+            bug_mask = activity_entry.get("met_bug_mask")
 
             if not met_values or not start_str:
                 continue
@@ -325,6 +331,10 @@ class Master:
 
             df = pd.DataFrame({"timestamp": timestamps, "met": met_values})
             df["source"] = "met"
+            if bug_mask and len(bug_mask) == len(met_values):
+                df["met_is_bug"] = bug_mask
+            else:
+                df["met_is_bug"] = False
 
             all_dfs.append(df)
 
@@ -385,11 +395,16 @@ class Master:
         # MET data
         df_met = self.build_master_met()
         if not df_met.empty:
-            df = df.merge(df_met[["timestamp", "met"]], on="timestamp", how="left")
+            merge_cols = ["timestamp", "met"]
+            if "met_is_bug" in df_met.columns:
+                merge_cols.append("met_is_bug")
+            df = df.merge(df_met[merge_cols], on="timestamp", how="left")
 
         # 8. Fill default values
         if "in_bed" in df.columns:
             df["in_bed"] = df["in_bed"].astype("boolean").fillna(False)
+        if "met_is_bug" in df.columns:
+            df["met_is_bug"] = df["met_is_bug"].astype("boolean").fillna(False).astype(bool)
 
         # 9. Add day field
         df["day"] = df["timestamp"].dt.date
@@ -423,6 +438,7 @@ class Master:
         # Define state color map
         state_colors = {
             "not_worn/battery_dead": "#aaaaaa",  # medium gray with hatch
+            "oura_bug": "#ff9800",  # orange for MET 0.9 bug
             "deep_sleep": "#0b3d91",  # dark blue
             "light_sleep": "#3c82e0",  # medium blue
             "REM_sleep": "#9ec5f2",  # light blue
@@ -450,6 +466,8 @@ class Master:
         else:
             fig = ax.figure
 
+        hatched_states = {"not_worn/battery_dead", "oura_bug"}
+
         for day in days:
             day_df = df[(df["shifted_day"] == day) & (df["in_bed"] == True)].copy()
             is_yesterday = day == days[-1]
@@ -473,16 +491,17 @@ class Master:
                             0.4 if is_yesterday else 1.0
                         ),  # signal that yesterday's sleep is not included in table
                         edgecolor=(
-                            "#888888" if state == "not_worn/battery_dead" else None
+                            "#888888" if state in hatched_states else None
                         ),
-                        hatch="///" if state == "not_worn/battery_dead" else None,
+                        hatch="///" if state in hatched_states else None,
                         linewidth=0.2,
                         zorder=2,
                     )
 
-        # Estimated rest underbar (0.1 < MET < 1.2)
-        # Excludes MET <= 0.1 which indicates non-wear, not rest
+        # Estimated rest underbar (0.1 < MET < MET_REST_THRESHOLD)
+        # Excludes MET <= 0.1 (non-wear) and short segments (speckles)
         rest_color = "#90EE90"  # light green
+        min_duration_hrs = MET_REST_MIN_DURATION_MIN / 60.0
         for day in days:
             day_df = df[df["shifted_day"] == day].copy()
             is_yesterday = day == days[-1]
@@ -501,6 +520,9 @@ class Master:
 
             segments = self.get_segments(rest_df)
             for start, end in segments:
+                # Skip short segments (speckles)
+                if (end - start) < min_duration_hrs:
+                    continue
                 ax.barh(
                     y=day_to_y[day] - 0.35,
                     width=end - start,
@@ -557,8 +579,8 @@ class Master:
             mpatches.Patch(
                 facecolor=color,
                 label=state.replace("_", " ").capitalize(),
-                hatch="///" if state == "not_worn/battery_dead" else None,
-                edgecolor="#888888" if state == "not_worn/battery_dead" else None,
+                hatch="///" if state in hatched_states else None,
+                edgecolor="#888888" if state in hatched_states else None,
                 linewidth=0.2,
             )
             for state, color in state_colors.items()
@@ -583,6 +605,8 @@ class Master:
         return fig, ax
 
     def assign_state(self, row):
+        if row.get("met_is_bug", False):
+            return "oura_bug"
         if (
             row.get("activity_class") == 0
             or pd.isna(row.get("met"))
@@ -645,10 +669,14 @@ class Master:
         df = df.sort_values(["shifted_day", "shifted_hour"])
 
         non_worn_label = "non_worn/battery_dead"
+        oura_bug_label = "oura_bug"
 
         # Define color buckets
         # Step 1: Define value-based bucket labels
-        def bucketize_met(val):
+        def bucketize_met(row):
+            val = row.get("met")
+            if row.get("met_is_bug", False):
+                return oura_bug_label
             if pd.isna(val) or val <= 0.1:
                 return non_worn_label
             elif val < 0.5:
@@ -664,11 +692,12 @@ class Master:
             else:
                 return "> 4.5"
 
-        df["met_bucket"] = df["met"].apply(bucketize_met)
+        df["met_bucket"] = df.apply(bucketize_met, axis=1)
 
         # Color map
         bucket_colors = {
             non_worn_label: "#aaaaaa",  # gray, non-worn
+            oura_bug_label: "#ff9800",  # orange, Oura MET 0.9 bug
             "0.1 - 0.5": "#deebf7",  # very light blue
             "0.5 - 1.0": "#9ecae1",  # light blue
             "1.0 - 2.0": "#6baed6",  # medium blue
@@ -686,6 +715,8 @@ class Master:
         else:
             fig = ax.figure
 
+        hatched_buckets = {non_worn_label, oura_bug_label}
+
         for day in days:
             day_df = df[df["shifted_day"] == day]
             for bucket, bucket_df in day_df.groupby("met_bucket"):
@@ -698,7 +729,9 @@ class Master:
                         height=0.6,
                         color=bucket_colors[bucket],
                         hatch="///",
-                        edgecolor=("#888888" if bucket == non_worn_label else "none"),
+                        edgecolor=(
+                            "#888888" if bucket in hatched_buckets else "none"
+                        ),
                         linewidth=0.2,
                         zorder=2,
                     )
@@ -744,8 +777,8 @@ class Master:
         legend_handles = [
             mpatches.Patch(
                 facecolor=color,
-                hatch="///" if bucket == non_worn_label else None,
-                edgecolor="#888888" if bucket == non_worn_label else "none",
+                hatch="///" if bucket in hatched_buckets else None,
+                edgecolor="#888888" if bucket in hatched_buckets else "none",
                 label=bucket.replace("_", " ").capitalize(),
             )
             for bucket, color in bucket_colors.items()
