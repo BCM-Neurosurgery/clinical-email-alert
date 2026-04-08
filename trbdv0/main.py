@@ -42,6 +42,9 @@ def main():
     parser.add_argument(
         "--config", type=str, default="config.json", help="Path to the config file"
     )
+    parser.add_argument(
+        "--subject-tag", type=str, default="", help="Optional tag prepended to email subject (e.g. commit hash)"
+    )
     args = parser.parse_args()
 
     config = read_config(args.config)
@@ -340,6 +343,8 @@ def main():
     if all_patient_stats:
         email_body = generate_email_body(all_patient_stats)
         subject = generate_subject_line(all_patient_stats)
+        if args.subject_tag:
+            subject = f"[{args.subject_tag}] {subject}"
         status = email_sender.send_email(
             email_recipients, subject, email_body, all_attachments
         )
