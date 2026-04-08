@@ -5,6 +5,7 @@ from trbdv0.utils import (
     get_todays_date,
     get_iter_dates,
 )
+from trbdv0.constants import MET_09_CONSECUTIVE_THRESHOLD_MIN
 import numpy as np
 
 
@@ -44,6 +45,7 @@ class Activity:
         # e.g. /home/auto/CODE/PerceptOCD/oura-null-pipeline/oura_out/DBSOCD002/2025-04-09
         self.patient_out_dir = patient_out_dir
         self.logger = logger
+        self.met_09_bug_days = []
         self.ingest()
 
     def ingest(self):
@@ -111,6 +113,19 @@ class Activity:
                         met_items = met.get("items", [])
                         met["items"] = met_items[:valid_len_min]
 
+                # Detect and clean MET 0.9 bug (long consecutive runs)
+                if met and met.get("items"):
+                    met["items"], bug_detected = self._detect_and_clean_met_09_bug(
+                        met["items"], MET_09_CONSECUTIVE_THRESHOLD_MIN
+                    )
+                    if bug_detected:
+                        bug_day = activity_entry.get("day", date)
+                        if bug_day not in self.met_09_bug_days:
+                            self.met_09_bug_days.append(bug_day)
+                        self.logger.warning(
+                            f"MET 0.9 bug detected for {self.patient} on {bug_day}"
+                        )
+
                 entry = {
                     "class_5_min": class_5_min,
                     "non_wear_time": activity_entry.get("non_wear_time", np.nan),
@@ -167,3 +182,43 @@ class Activity:
                         "timestamp": entry["timestamp"],
                     }
                 )
+
+    def _detect_and_clean_met_09_bug(
+        self, met_items: list, threshold_minutes: int
+    ) -> tuple:
+        """Detect and clean the Oura MET 0.9 autofill bug.
+
+        When the ring is not worn, Oura sometimes fills MET values with 0.9
+        instead of proper no-wear indicators. This manifests as long consecutive
+        runs of exactly 0.9.
+
+        Args:
+            met_items: List of MET values (1-minute resolution).
+            threshold_minutes: Minimum consecutive 0.9 run length to flag as bug.
+
+        Returns:
+            (cleaned_items, bug_detected): Items with buggy runs replaced by NaN.
+        """
+        bug_detected = False
+        cleaned = list(met_items)
+
+        # Find all consecutive runs of exactly 0.9
+        run_start = None
+        for i, val in enumerate(cleaned):
+            if val == 0.9:
+                if run_start is None:
+                    run_start = i
+            else:
+                if run_start is not None and (i - run_start) >= threshold_minutes:
+                    for j in range(run_start, i):
+                        cleaned[j] = float("nan")
+                    bug_detected = True
+                run_start = None
+
+        # Handle run that extends to the end
+        if run_start is not None and (len(cleaned) - run_start) >= threshold_minutes:
+            for j in range(run_start, len(cleaned)):
+                cleaned[j] = float("nan")
+            bug_detected = True
+
+        return cleaned, bug_detected

@@ -40,6 +40,18 @@ MET_VARIATION = "met_variation"
 
 LASTDAY_NON_WEAR_TIME_OVER_8 = "lastday_non_wear_time_over_8"
 
+# MET 0.9 bug detection
+MET_09_CONSECUTIVE_THRESHOLD_MIN = 360  # 6 hours in minutes
+MET_09_BUG_DETECTED = "met_09_bug_detected"
+MET_09_BUG_DATES = "met_09_bug_dates"
+
+# MET-inferred rest threshold
+MET_REST_THRESHOLD = 1.2
+
+# inactive patient status
+IS_INACTIVE = "is_inactive"
+HAS_DATA_WHILE_INACTIVE = "has_data_while_inactive"
+
 # keys for email body columns
 PT_COLUMN = "Patient"
 MISSING_LASTDAY_SLEEP_COLUMN = "Missing Last Day Sleep"

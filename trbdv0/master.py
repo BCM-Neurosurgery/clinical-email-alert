@@ -480,6 +480,34 @@ class Master:
                         zorder=2,
                     )
 
+        # Estimated rest underbar (MET < 1.2, not NaN)
+        rest_color = "#90EE90"  # light green
+        for day in days:
+            day_df = df[df["shifted_day"] == day].copy()
+            is_yesterday = day == days[-1]
+
+            if "met" not in day_df.columns:
+                continue
+
+            rest_df = day_df[day_df["met"].notna() & (day_df["met"] < MET_REST_THRESHOLD)]
+
+            if rest_df.empty:
+                continue
+
+            segments = self.get_segments(rest_df)
+            for start, end in segments:
+                ax.barh(
+                    y=day_to_y[day] - 0.3,
+                    width=end - start,
+                    left=start,
+                    height=0.15,
+                    color=rest_color,
+                    alpha=0.4 if is_yesterday else 0.7,
+                    edgecolor="none",
+                    linewidth=0,
+                    zorder=1.5,
+                )
+
         # Annotate yesterday to indicate exclusion from analysis
         yesterday = days[-1]
         y = day_to_y[yesterday]
@@ -530,6 +558,13 @@ class Master:
             )
             for state, color in state_colors.items()
         ]
+        legend_handles.append(
+            mpatches.Patch(
+                facecolor=rest_color,
+                alpha=0.7,
+                label="Estimated rest (MET < 1.2)",
+            )
+        )
         ax.legend(
             handles=legend_handles,
             loc="upper left",
@@ -1185,6 +1220,8 @@ class Master:
             MISSING_SLEEP_DATES: self.get_nan_sleep_dates(),
             NUMBER_OF_NANSLEEP_DAYS: len(self.get_nan_sleep_dates()),
             NUMBER_OF_DAYS: self.get_total_days(),
+            MET_09_BUG_DATES: self.activity.met_09_bug_days,
+            MET_09_BUG_DETECTED: len(self.activity.met_09_bug_days) > 0,
         }
 
     def generate_warning_flags(self, summary: dict) -> dict:
