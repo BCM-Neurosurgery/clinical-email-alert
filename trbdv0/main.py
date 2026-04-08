@@ -93,8 +93,8 @@ def main():
     all_patient_stats = []
     all_attachments = []
     all_free_responses = []  # To store all ISS free responses
-    inactive_patients = set(config.get("inactive_patients", []))
-    all_patients = config["active_patients"] + config.get("inactive_patients", [])
+    inactive_patients = config.get("inactive_patients", {})
+    all_patients = config["active_patients"] + list(inactive_patients.keys())
 
     for patient in all_patients:
         # locate patient folder
@@ -122,12 +122,16 @@ def main():
         is_inactive = patient in inactive_patients
         patient_summary_stats[IS_INACTIVE] = is_inactive
 
-        # Determine if data appeared for an inactive patient
+        # Determine if new data appeared after patient was marked inactive
         if is_inactive:
-            has_data = not (
+            inactive_since = inactive_patients[patient]
+            lastday_date = patient_summary_stats.get(LASTDAY_DATE, "")
+            has_recent_data = not (
                 pd.isna(patient_summary_stats.get(LASTDAY_SLEEP_HOURS))
                 and pd.isna(patient_summary_stats.get(LASTDAY_MET))
             )
+            # Only flag blue if data appeared AFTER the inactive date
+            has_data = has_recent_data and lastday_date > inactive_since
             patient_summary_stats[HAS_DATA_WHILE_INACTIVE] = has_data
 
         warnings = master.generate_warning_flags(patient_summary_stats)
