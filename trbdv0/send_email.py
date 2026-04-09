@@ -130,6 +130,13 @@ def generate_subject_line(all_patient_stats: list) -> str:
 
     for entry in all_patient_stats:
         patient = entry["summary"]["patient"]
+        is_inactive = entry["summary"].get(IS_INACTIVE, False)
+
+        if is_inactive:
+            # Only flag inactive patients if unexpected data appeared
+            if entry["summary"].get(HAS_DATA_WHILE_INACTIVE, False):
+                needs_attention.append(f"{patient} (inactive-data)")
+            continue
 
         # 1) any Wearables warning?
         has_oura_warn = any(entry["warning"].values())
@@ -174,7 +181,11 @@ def generate_email_body(all_patient_stats: list) -> str:
     df_rows = []
     survey_rows = []
 
-    def style(val, warnings_dict, *flags):
+    def style(val, warnings_dict, *flags, is_inactive=False, has_data_inactive=False):
+        if is_inactive:
+            if has_data_inactive:
+                return f'<span style="background-color: #64B5F6; color: white">{val}</span>'
+            return f'<span style="color: #999999">{val}</span>'
         if pd.isna(val) or any(warnings_dict.get(flag, False) for flag in flags):
             return f'<span style="background-color: #ff5252">{val}</span>'
         return val
@@ -220,48 +231,75 @@ def generate_email_body(all_patient_stats: list) -> str:
 
         return raw
 
+    any_met_bug = False
+
     for entry in all_patient_stats:
         summary = entry["summary"]
         warnings = entry["warning"]
         patient = summary["patient"]
         surveys = entry.get("surveys", {})
+        is_inactive = summary.get(IS_INACTIVE, False)
+        has_data_inactive = summary.get(HAS_DATA_WHILE_INACTIVE, False)
+        inactive_kw = dict(is_inactive=is_inactive, has_data_inactive=has_data_inactive)
+        patient_label = f"{patient} (inactive)" if is_inactive else patient
+
+        if summary.get(MET_09_BUG_DETECTED, False):
+            any_met_bug = True
 
         df_rows.append(
             {
-                PT_COLUMN: patient,
+                PT_COLUMN: patient_label,
                 LASTDAY_SLEEP_COLUMN: style(
                     f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
                     warnings,
                     LASTDAY_SLEEP_NAN,
                     LASTDAY_SLEEP_LESS_THAN_6,
                     SLEEP_VARIATION,
+                    **inactive_kw,
+                ),
+                LASTDAY_SLEEP_SCORE_COLUMN: style(
+                    f"{summary.get(LASTDAY_SLEEP_SCORE, np.nan):.0f}",
+                    warnings,
+                    LASTDAY_SLEEP_SCORE_NAN,
+                    **inactive_kw,
                 ),
                 AVERAGE_SLEEP_COLUMN: style(
                     f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
                     warnings,
                     AVERAGE_SLEEP_NAN,
+                    **inactive_kw,
+                ),
+                AVERAGE_SLEEP_SCORE_COLUMN: style(
+                    f"{summary.get(AVERAGE_SLEEP_SCORE, np.nan):.0f}",
+                    warnings,
+                    AVERAGE_SLEEP_SCORE_NAN,
+                    **inactive_kw,
                 ),
                 LASTDAY_STEPS_COLUMN: style(
                     f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
                     warnings,
                     # LASTDAY_STEPS_NAN,
                     # STEPS_VARIATION,
+                    **inactive_kw,
                 ),
                 AVERAGE_STEPS_COLUMN: style(
                     f"{summary.get(AVERAGE_STEPS, np.nan):.0f}",
                     warnings,
                     # AVERAGE_STEPS_NAN,
+                    **inactive_kw,
                 ),
                 LASTDAY_MET_COLUMN: style(
                     f"{summary.get(LASTDAY_MET, np.nan):.2f}",
                     warnings,
                     LASTDAY_MET_NAN,
                     MET_VARIATION,
+                    **inactive_kw,
                 ),
                 AVERAGE_MET_COLUMN: style(
                     f"{summary.get(AVERAGE_MET, np.nan):.2f}",
                     warnings,
                     AVERAGE_MET_NAN,
+                    **inactive_kw,
                 ),
             }
         )
@@ -334,7 +372,16 @@ def generate_email_body(all_patient_stats: list) -> str:
             "</p>"
         )
 
-    return html_summary_table + note + html_survey_table + survey_note
+    met_bug_note = ""
+    if any_met_bug:
+        met_bug_note = (
+            "<p style='font-size:0.9em; color:#555;'>"
+            "<strong>MET 0.9 Bug:</strong> Some days had extended periods of MET=0.9 "
+            "(Oura autofill when ring is not worn). These values were excluded from averages."
+            "</p>"
+        )
+
+    return html_summary_table + note + met_bug_note + html_survey_table + survey_note
 
 
 def get_attachments(dir: str):

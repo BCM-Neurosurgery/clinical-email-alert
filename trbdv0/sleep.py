@@ -7,6 +7,7 @@ from trbdv0.utils import (
     get_past_dates,
     read_json,
     get_iter_dates,
+    get_last_day,
 )
 import pytz
 
@@ -70,6 +71,69 @@ class Sleep:
     def get_sleep_data(self):
         return self.sleep_data
 
+    def get_daily_sleep_score(self, date_str: str) -> float:
+        """Returns the daily sleep score for a specific date.
+
+        Args:
+            date_str (str): Date string in "YYYY-MM-DD" format.
+
+        Returns:
+            float: Sleep score or np.nan if not found.
+        """
+        daily_sleep_path = os.path.join(
+            self.patient_in_dir, date_str, "daily_sleep.json"
+        )
+
+        if not os.path.exists(daily_sleep_path):
+            self.logger.error(f"{date_str} daily_sleep.json not found.")
+            return np.nan
+
+        try:
+            daily_sleep_data = read_json(daily_sleep_path)
+        except Exception as e:
+            self.logger.error(f"Failed to read daily_sleep.json for {date_str}: {e}")
+            return np.nan
+
+        if not daily_sleep_data:
+            return np.nan
+
+        entries = (
+            daily_sleep_data
+            if isinstance(daily_sleep_data, list)
+            else [daily_sleep_data]
+        )
+
+        for entry in entries:
+            if entry.get("day") == date_str and entry.get("score") is not None:
+                try:
+                    return float(entry.get("score"))
+                except (TypeError, ValueError):
+                    return np.nan
+
+        for entry in entries:
+            if entry.get("score") is not None:
+                try:
+                    return float(entry.get("score"))
+                except (TypeError, ValueError):
+                    return np.nan
+
+        return np.nan
+
+    def get_average_sleep_score(self) -> float:
+        """Returns the average daily sleep score for the master analysis window."""
+        end_date = get_last_day()
+        date_list = get_iter_dates(end_date, self.num_past_days)
+        scores = []
+        for date_str in date_list:
+            score = self.get_daily_sleep_score(date_str)
+            if not pd.isna(score):
+                scores.append(score)
+
+        if not scores:
+            return np.nan
+
+        return float(np.mean(scores))
+
     def ingest(self):
         """Ingests sleep data for a range of past dates.
 
@@ -90,6 +154,7 @@ class Sleep:
         """
         self.sleep_data = []
         self.bedtimes = []
+        seen_bedtimes = set()
 
         for date in self.iter_past_dates:
             patient_date_json = os.path.join(self.patient_in_dir, date, "sleep.json")
@@ -105,10 +170,23 @@ class Sleep:
                 continue
 
             for sleep_entry in sleep_data:
+                bt_start = sleep_entry.get("bedtime_start", np.nan)
+                bt_end = sleep_entry.get("bedtime_end", np.nan)
+
+                # Skip duplicate sleep entries (Oura API bug)
+                key = (bt_start, bt_end)
+                if key in seen_bedtimes:
+                    self.logger.warning(
+                        f"Skipping duplicate sleep entry for {date}: "
+                        f"{bt_start} -> {bt_end}"
+                    )
+                    continue
+                seen_bedtimes.add(key)
+
                 entry = {
                     "sleep_phase_5_min": sleep_entry.get("sleep_phase_5_min", np.nan),
-                    "bedtime_start": sleep_entry.get("bedtime_start", np.nan),
-                    "bedtime_end": sleep_entry.get("bedtime_end", np.nan),
+                    "bedtime_start": bt_start,
+                    "bedtime_end": bt_end,
                     "total_sleep_duration": sleep_entry.get(
                         "total_sleep_duration", np.nan
                     ),

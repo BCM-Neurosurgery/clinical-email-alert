@@ -18,6 +18,7 @@ from trbdv0.utils import (
 import os
 import logging
 import pytz
+import pandas as pd
 from trbdv0.logger_setup import setup_logger
 from datetime import datetime
 from trbdv0.send_email import (
@@ -40,6 +41,9 @@ def main():
     parser = argparse.ArgumentParser(description="Run the notification system.")
     parser.add_argument(
         "--config", type=str, default="config.json", help="Path to the config file"
+    )
+    parser.add_argument(
+        "--subject-tag", type=str, default="", help="Optional tag prepended to email subject (e.g. commit hash)"
     )
     args = parser.parse_args()
 
@@ -92,8 +96,10 @@ def main():
     all_patient_stats = []
     all_attachments = []
     all_free_responses = []  # To store all ISS free responses
+    inactive_patients = config.get("inactive_patients", {})
+    all_patients = config["active_patients"] + list(inactive_patients.keys())
 
-    for patient in config["active_patients"]:
+    for patient in all_patients:
         # locate patient folder
         patient_in_dir = None
         for d in config["input_dir"]:
@@ -116,18 +122,33 @@ def main():
         master = Master(sleep, activity)
 
         patient_summary_stats = master.get_summary_stats()
+        is_inactive = patient in inactive_patients
+        patient_summary_stats[IS_INACTIVE] = is_inactive
+
+        # Determine if new data appeared after patient was marked inactive
+        if is_inactive:
+            inactive_since = inactive_patients[patient]
+            lastday_date = patient_summary_stats.get(LASTDAY_DATE, "")
+            has_recent_data = not (
+                pd.isna(patient_summary_stats.get(LASTDAY_SLEEP_HOURS))
+                and pd.isna(patient_summary_stats.get(LASTDAY_MET))
+            )
+            # Only flag blue if data appeared AFTER the inactive date
+            has_data = has_recent_data and lastday_date > inactive_since
+            patient_summary_stats[HAS_DATA_WHILE_INACTIVE] = has_data
+
         warnings = master.generate_warning_flags(patient_summary_stats)
 
-        # send quatrics survey if sleep_variation is triggered
-        if warnings[SLEEP_VARIATION]:
+        # send quatrics survey if sleep_variation is triggered (skip for inactive)
+        if not is_inactive and warnings[SLEEP_VARIATION]:
             if patient in quatrics_sleep_reminder:
                 logger.info(
                     f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
                 )
                 send_survey(patient, quatrics_config)
 
-        # send quatrics survey if non_wear_time is triggered
-        if warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
+        # send quatrics survey if non_wear_time is triggered (skip for inactive)
+        if not is_inactive and warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
             if patient in quatrics_nonwear_reminder:
                 logger.info(
                     f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
@@ -322,6 +343,8 @@ def main():
     if all_patient_stats:
         email_body = generate_email_body(all_patient_stats)
         subject = generate_subject_line(all_patient_stats)
+        if args.subject_tag:
+            subject = f"[{args.subject_tag}] {subject}"
         status = email_sender.send_email(
             email_recipients, subject, email_body, all_attachments
         )

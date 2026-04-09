@@ -6,6 +6,8 @@ LASTDAY_DATE = "lastday_date"
 
 LASTDAY_SLEEP_HOURS = "lastday_sleep_hours"
 AVERAGE_SLEEP_HOURS = "average_sleep_hours"
+LASTDAY_SLEEP_SCORE = "lastday_sleep_score"
+AVERAGE_SLEEP_SCORE = "average_sleep_score"
 
 LASTDAY_NON_WEAR_TIME_S = "lastday_non_wear_time_s"
 
@@ -25,6 +27,8 @@ AVERAGE_SLEEP_NAN = "average_sleep_nan"
 HAS_NAN_SLEEP_DAYS = "has_nansleep_days"
 LASTDAY_SLEEP_LESS_THAN_6 = "lastday_sleep_less_than_6"
 SLEEP_VARIATION = "sleep_variation"
+LASTDAY_SLEEP_SCORE_NAN = "lastday_sleep_score_nan"
+AVERAGE_SLEEP_SCORE_NAN = "average_sleep_score_nan"
 
 LASTDAY_STEPS_NAN = "lastday_steps_nan"
 AVERAGE_STEPS_NAN = "average_steps_nan"
@@ -36,12 +40,27 @@ MET_VARIATION = "met_variation"
 
 LASTDAY_NON_WEAR_TIME_OVER_8 = "lastday_non_wear_time_over_8"
 
+# MET 0.9 bug detection
+MET_09_CONSECUTIVE_THRESHOLD_MIN = 360  # 6 hours in minutes
+MET_09_BUG_DETECTED = "met_09_bug_detected"
+MET_09_BUG_DATES = "met_09_bug_dates"
+
+# MET-inferred rest threshold
+MET_REST_THRESHOLD = 1.1
+MET_REST_MIN_DURATION_MIN = 10  # minimum rest segment duration in minutes
+
+# inactive patient status
+IS_INACTIVE = "is_inactive"
+HAS_DATA_WHILE_INACTIVE = "has_data_while_inactive"
+
 # keys for email body columns
 PT_COLUMN = "Patient"
 MISSING_LASTDAY_SLEEP_COLUMN = "Missing Last Day Sleep"
 
 LASTDAY_SLEEP_COLUMN = "Sleep (12pm-12pm, Day-2 to Yesterday)"
+LASTDAY_SLEEP_SCORE_COLUMN = "Daily Sleep Score"
 AVERAGE_SLEEP_COLUMN = "Average Sleep (h)"
+AVERAGE_SLEEP_SCORE_COLUMN = "Average Sleep Score"
 
 LASTDAY_STEPS_COLUMN = "Day-2 Steps"
 AVERAGE_STEPS_COLUMN = "Average Steps"
