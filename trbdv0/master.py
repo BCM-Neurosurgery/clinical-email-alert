@@ -404,7 +404,9 @@ class Master:
         if "in_bed" in df.columns:
             df["in_bed"] = df["in_bed"].astype("boolean").fillna(False)
         if "met_is_bug" in df.columns:
-            df["met_is_bug"] = df["met_is_bug"].astype("boolean").fillna(False).astype(bool)
+            df["met_is_bug"] = (
+                df["met_is_bug"].astype("boolean").fillna(False).astype(bool)
+            )
 
         # 9. Add day field
         df["day"] = df["timestamp"].dt.date
@@ -490,9 +492,7 @@ class Master:
                         alpha=(
                             0.4 if is_yesterday else 1.0
                         ),  # signal that yesterday's sleep is not included in table
-                        edgecolor=(
-                            "#888888" if state in hatched_states else None
-                        ),
+                        edgecolor=("#888888" if state in hatched_states else None),
                         hatch="///" if state in hatched_states else None,
                         linewidth=0.2,
                         zorder=2,
@@ -729,9 +729,7 @@ class Master:
                         height=0.6,
                         color=bucket_colors[bucket],
                         hatch="///",
-                        edgecolor=(
-                            "#888888" if bucket in hatched_buckets else "none"
-                        ),
+                        edgecolor=("#888888" if bucket in hatched_buckets else "none"),
                         linewidth=0.2,
                         zorder=2,
                     )
@@ -944,96 +942,156 @@ class Master:
         result_df = result_df[["Date", "TimeRange", "SleepHours"]]
         return result_df
 
+    def compute_rest_hours(self) -> pd.DataFrame:
+        """Computes daily MET-based rest estimate (in hours) for each shifted_day.
+
+        Rest is defined as contiguous segments where 0.1 < MET < MET_REST_THRESHOLD,
+        excluding segments shorter than MET_REST_MIN_DURATION_MIN minutes.
+        """
+        df = self.plot_integrated_time
+
+        if df.empty or "met" not in df.columns or "shifted_day" not in df.columns:
+            return pd.DataFrame({"Date": [], "RestHours": []})
+
+        rest_mask = (
+            df["met"].notna() & (df["met"] > 0.1) & (df["met"] < MET_REST_THRESHOLD)
+        )
+        rest_df = df[rest_mask].copy()
+
+        if rest_df.empty:
+            return pd.DataFrame({"Date": [], "RestHours": []})
+
+        records = []
+        for day, day_df in rest_df.groupby("shifted_day"):
+            day_df = day_df.sort_values("timestamp")
+            time_diffs = day_df["timestamp"].diff()
+            segment_ids = (time_diffs > pd.Timedelta(minutes=1)).cumsum()
+            valid = day_df.groupby(segment_ids).filter(
+                lambda g: len(g) >= MET_REST_MIN_DURATION_MIN
+            )
+            records.append({"Date": day, "RestHours": len(valid) / 60.0})
+
+        result_df = pd.DataFrame(records)
+        return result_df
+
     def plot_daily_sleep_hours(self):
         """
-        Generates and saves a plot of daily sleep hours with an average line.
-        This method computes the sleep data internally before plotting.
+        Generates and saves a plot of daily sleep hours and rest estimate
+        with average lines.
         """
-        # Directly call the compute method to get the data
-        sleep_data_df = self.compute_sleep_hours()
+        sleep_df = self.compute_sleep_hours()
+        rest_df = self.compute_rest_hours()
+        has_sleep = not sleep_df.empty
+        has_rest = not rest_df.empty
 
-        if sleep_data_df.empty:
-            print("[Warning] Sleep data is empty. Cannot generate plot.")
+        if not has_sleep and not has_rest:
+            print("[Warning] Sleep and rest data are both empty. Cannot generate plot.")
             return
 
-        # Ensure 'Date' is in datetime format for proper plotting
-        df = sleep_data_df.copy()
-        df["Date"] = pd.to_datetime(df["Date"])
+        if has_sleep:
+            sleep_df = sleep_df.copy()
+            sleep_df["Date"] = pd.to_datetime(sleep_df["Date"])
+        if has_rest:
+            rest_df = rest_df.copy()
+            rest_df["Date"] = pd.to_datetime(rest_df["Date"])
 
-        # Calculate yesterday's date
         yesterday = (
             datetime.now(tz=pytz.timezone(self.timezone)) - timedelta(days=1)
         ).date()
 
-        # Filter out yesterday's data for average calculation
-        df_for_avg = df[df["Date"].dt.date != yesterday]
-        avg_sleep = df_for_avg["SleepHours"].mean()
-
         fig, ax = plt.subplots(figsize=(12, 7))
 
-        # Plot daily sleep hours as a line with points
-        # Separate plotting for yesterday's data if it exists
-        yesterday_data = df[df["Date"].dt.date == yesterday]
-        other_data = df[df["Date"].dt.date != yesterday]
-
-        if not other_data.empty:
-            ax.plot(
-                other_data["Date"],
-                other_data["SleepHours"],
-                marker="o",
-                linestyle="-",
-                label="Daily Sleep",
-                color="blue",  # Default color for other data
-            )
-
-        if not yesterday_data.empty:
-            ax.plot(
-                yesterday_data["Date"],
-                yesterday_data["SleepHours"],
-                marker="o",
-                linestyle="--",  # Use a different linestyle for distinction
-                label="Excluded from analysis",  # Label for the legend
-                color="lightgray",  # Lighter color
-                markersize=8,
-                markeredgecolor="darkgray",
-            )
-            # Annotate yesterday's point with both value and exclusion text
-            for index, row in yesterday_data.iterrows():
-                ax.text(
-                    row["Date"],
-                    row["SleepHours"]
-                    + 0.5,  # Adjust vertical position for the main annotation
-                    f"{row['SleepHours']:.1f} \n(Excluded from analysis)",  # Combine text
-                    ha="center",
-                    va="bottom",
-                    fontsize=10,
-                    color="darkgray",
-                    fontweight="bold",
+        # --- Sleep line ---
+        if has_sleep:
+            yesterday_sleep = sleep_df[sleep_df["Date"].dt.date == yesterday]
+            other_sleep = sleep_df[sleep_df["Date"].dt.date != yesterday]
+            if not other_sleep.empty:
+                ax.plot(
+                    other_sleep["Date"],
+                    other_sleep["SleepHours"],
+                    marker="o",
+                    linestyle="-",
+                    label="Daily Sleep",
+                    color="blue",
                 )
 
-        ax.axhline(
-            y=avg_sleep,
-            color="r",
-            linestyle="--",
-            label=f"Average (Excl. Yesterday): {avg_sleep:.1f} hrs",
-        )
+                avg_sleep = other_sleep["SleepHours"].mean()
+                ax.axhline(
+                    y=avg_sleep,
+                    color="r",
+                    linestyle="--",
+                    label=f"Sleep Avg (Excl. Yesterday): {avg_sleep:.1f} hrs",
+                )
 
-        # Annotate each data point (excluding yesterday's, as it's handled separately)
-        for index, row in other_data.iterrows():
-            ax.text(
-                row["Date"],
-                row["SleepHours"] - 0.3,
-                f"{row['SleepHours']:.1f}",
-                ha="center",
-                va="top",
-                fontsize=9,
-                color="navy",
+            if not yesterday_sleep.empty:
+                ax.plot(
+                    yesterday_sleep["Date"],
+                    yesterday_sleep["SleepHours"],
+                    marker="o",
+                    linestyle="--",
+                    label="Excluded from analysis",
+                    color="lightgray",
+                    markersize=8,
+                    markeredgecolor="darkgray",
+                )
+                for index, row in yesterday_sleep.iterrows():
+                    ax.text(
+                        row["Date"],
+                        row["SleepHours"] + 0.5,
+                        f"S: {row['SleepHours']:.1f} \n(Excluded from analysis)",
+                        ha="center",
+                        va="bottom",
+                        fontsize=10,
+                        color="darkgray",
+                        fontweight="bold",
+                    )
+
+            for index, row in other_sleep.iterrows():
+                ax.text(
+                    row["Date"],
+                    row["SleepHours"] - 0.3,
+                    f"S: {row['SleepHours']:.1f}",
+                    ha="center",
+                    va="top",
+                    fontsize=9,
+                    color="navy",
+                )
+
+        # --- Rest estimate line (includes yesterday — not subject to sync lag) ---
+        if has_rest:
+            ax.plot(
+                rest_df["Date"],
+                rest_df["RestHours"],
+                marker="^",
+                linestyle="-",
+                label="Daily Rest Estimate",
+                color="#2ca02c",
+                alpha=0.7,
             )
 
-        # --- Formatting the plot ---
+            avg_rest = rest_df["RestHours"].mean()
+            ax.axhline(
+                y=avg_rest,
+                color="#2ca02c",
+                linestyle=":",
+                label=f"Rest Avg: {avg_rest:.1f} hrs",
+            )
+
+            for index, row in rest_df.iterrows():
+                ax.text(
+                    row["Date"],
+                    row["RestHours"] + 0.3,
+                    f"R: {row['RestHours']:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    color="darkgreen",
+                )
+
+        # --- Formatting ---
         ax.set_title("Daily Sleep Duration", fontsize=16)
         ax.set_xlabel("Date", fontsize=12)
-        ax.set_ylabel("Sleep (Hours)", fontsize=12)
+        ax.set_ylabel("Hours", fontsize=12)
         ax.legend()
         ax.grid(True, which="both", linestyle="--", linewidth=0.5)
 
@@ -1041,9 +1099,11 @@ class Master:
         ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
         fig.autofmt_xdate(rotation=45)
 
-        ax.set_ylim(
-            bottom=max(0, df["SleepHours"].min() - 1), top=df["SleepHours"].max() + 1
+        all_values = pd.concat(
+            ([sleep_df["SleepHours"]] if has_sleep else [])
+            + ([rest_df["RestHours"]] if has_rest else [])
         )
+        ax.set_ylim(bottom=max(0, all_values.min() - 1), top=all_values.max() + 1.5)
         ax.set_xlim(
             [
                 self.plot_integrated_time["shifted_day"].min(),
