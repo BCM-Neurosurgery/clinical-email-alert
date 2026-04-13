@@ -974,6 +974,28 @@ class Master:
         result_df = pd.DataFrame(records)
         return result_df
 
+    def compute_yesterday_rest_hours(self) -> float:
+        """Returns total rest estimate hours for yesterday (Day-1).
+
+        Unlike sleep which uses Day-2 due to sync lag, rest estimate uses
+        Day-1 since MET-based estimation is not subject to the same delay.
+
+        Returns:
+            float: Rest hours for yesterday, or np.nan if no data.
+        """
+        rest_df = self.compute_rest_hours()
+        if rest_df.empty:
+            return np.nan
+
+        yesterday = datetime.strptime(
+            get_yesterdays_date(self.timezone), "%Y-%m-%d"
+        ).date()
+        match = rest_df[rest_df["Date"] == yesterday]
+        if match.empty:
+            return np.nan
+
+        return match.iloc[0]["RestHours"]
+
     def plot_daily_sleep_hours(self):
         """
         Generates and saves a plot of daily sleep hours and rest estimate
@@ -1315,6 +1337,7 @@ class Master:
             LASTDAY_STEPS: self.compute_lastday_steps(),
             AVERAGE_MET: self.compute_average_met(),
             LASTDAY_MET: self.compute_lastday_met(),
+            YESTERDAY_REST_HOURS: self.compute_yesterday_rest_hours(),
             MISSING_SLEEP_DATES: self.get_nan_sleep_dates(),
             NUMBER_OF_NANSLEEP_DAYS: len(self.get_nan_sleep_dates()),
             NUMBER_OF_DAYS: self.get_total_days(),

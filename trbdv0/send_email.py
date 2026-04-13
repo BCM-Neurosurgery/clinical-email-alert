@@ -249,6 +249,7 @@ def generate_email_body(all_patient_stats: list) -> str:
         df_rows.append(
             {
                 PT_COLUMN: patient_label,
+                # Sleep/rest hours group
                 LASTDAY_SLEEP_COLUMN: style(
                     f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
                     warnings,
@@ -257,16 +258,22 @@ def generate_email_body(all_patient_stats: list) -> str:
                     SLEEP_VARIATION,
                     **inactive_kw,
                 ),
-                LASTDAY_SLEEP_SCORE_COLUMN: style(
-                    f"{summary.get(LASTDAY_SLEEP_SCORE, np.nan):.0f}",
-                    warnings,
-                    LASTDAY_SLEEP_SCORE_NAN,
-                    **inactive_kw,
-                ),
                 AVERAGE_SLEEP_COLUMN: style(
                     f"{summary.get(AVERAGE_SLEEP_HOURS, np.nan):.1f}",
                     warnings,
                     AVERAGE_SLEEP_NAN,
+                    **inactive_kw,
+                ),
+                YESTERDAY_REST_COLUMN: style(
+                    f"{summary.get(YESTERDAY_REST_HOURS, np.nan):.1f}",
+                    warnings,
+                    **inactive_kw,
+                ),
+                # Sleep score group
+                LASTDAY_SLEEP_SCORE_COLUMN: style(
+                    f"{summary.get(LASTDAY_SLEEP_SCORE, np.nan):.0f}",
+                    warnings,
+                    LASTDAY_SLEEP_SCORE_NAN,
                     **inactive_kw,
                 ),
                 AVERAGE_SLEEP_SCORE_COLUMN: style(
@@ -275,6 +282,7 @@ def generate_email_body(all_patient_stats: list) -> str:
                     AVERAGE_SLEEP_SCORE_NAN,
                     **inactive_kw,
                 ),
+                # Steps group
                 LASTDAY_STEPS_COLUMN: style(
                     f"{summary.get(LASTDAY_STEPS, np.nan):.0f}",
                     warnings,
@@ -288,6 +296,7 @@ def generate_email_body(all_patient_stats: list) -> str:
                     # AVERAGE_STEPS_NAN,
                     **inactive_kw,
                 ),
+                # MET group
                 LASTDAY_MET_COLUMN: style(
                     f"{summary.get(LASTDAY_MET, np.nan):.2f}",
                     warnings,

@@ -17,6 +17,8 @@ AVERAGE_STEPS = "average_steps"
 LASTDAY_MET = "lastday_met"
 AVERAGE_MET = "average_met"
 
+YESTERDAY_REST_HOURS = "yesterday_rest_hours"
+
 MISSING_SLEEP_DATES = "missing_sleep_dates"
 NUMBER_OF_NANSLEEP_DAYS = "number_of_nansleep_days"
 NUMBER_OF_DAYS = "number_of_days"
@@ -67,6 +69,8 @@ AVERAGE_STEPS_COLUMN = "Average Steps"
 
 LASTDAY_MET_COLUMN = "Day-2 Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
+
+YESTERDAY_REST_COLUMN = "Rest Estimate (h, Day-1)"
 
 # a mapping of survey IDs to processor classes
 SURVEY_CLASSES = {
