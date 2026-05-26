@@ -58,6 +58,20 @@ class Master:
             .reset_index(drop=True)
         )
 
+    @staticmethod
+    def _sleep_minutes_by_day(df: pd.DataFrame) -> pd.Series:
+        """Counts sleep-phase minutes by shifted day for numeric summaries."""
+        required_cols = {"timestamp", "shifted_day", "sleep_phase_label"}
+        if df.empty or not required_cols.issubset(df.columns):
+            return pd.Series(dtype="int64")
+
+        sleep_labels = {"deep", "light", "REM"}
+        sleep_df = df[df["sleep_phase_label"].isin(sleep_labels)]
+        if sleep_df.empty:
+            return pd.Series(dtype="int64")
+
+        return sleep_df.groupby("shifted_day")["timestamp"].nunique()
+
     def build_time_grid(
         self, num_past_days: int, offset: int = 12, end_date: str = "yesterday"
     ) -> pd.DataFrame:
@@ -876,17 +890,11 @@ class Master:
             )
             return np.nan
 
-        df["state"] = df.apply(self.assign_state, axis=1)
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if daily_sleep_minutes.empty:
+            return np.nan
 
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[df["state"].isin(sleep_states)]
-
-        daily_sleep = (
-            sleep_df.groupby("shifted_day")["timestamp"]
-            .nunique()
-            .rename("sleep_minutes")
-            .reset_index()
-        )
+        daily_sleep = daily_sleep_minutes.rename("sleep_minutes").reset_index()
 
         daily_sleep["sleep_hours"] = daily_sleep["sleep_minutes"] / 60.0
         avg_sleep_hours = daily_sleep["sleep_hours"].mean()
@@ -909,16 +917,11 @@ class Master:
 
         lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
-        df = df.copy()
-        df["state"] = df.apply(self.assign_state, axis=1)
-
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[(df["shifted_day"] == lastday) & (df["state"].isin(sleep_states))]
-
-        if sleep_df.empty:
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if lastday not in daily_sleep_minutes.index:
             return np.nan
 
-        sleep_minutes = sleep_df["timestamp"].nunique()
+        sleep_minutes = daily_sleep_minutes.loc[lastday]
         sleep_hours = sleep_minutes / 60.0
 
         return sleep_hours
@@ -947,17 +950,11 @@ class Master:
             )
             return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
 
-        df = df.copy()
-        # Assign a state (e.g., 'deep_sleep', 'awake') to each minute/row
-        df["state"] = df.apply(self.assign_state, axis=1)
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[df["state"].isin(sleep_states)]
-
-        if sleep_df.empty:
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if daily_sleep_minutes.empty:
             return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
 
-        # Group by day, count the number of minutes (rows), and store it
-        daily_sleep_minutes = sleep_df.groupby("shifted_day")["timestamp"].nunique()
+        # Group by day, count the number of unique minutes, and store it
         daily_sleep_hours = daily_sleep_minutes / 60.0
         result_df = daily_sleep_hours.reset_index(name="SleepHours")
         result_df.rename(columns={"shifted_day": "Date"}, inplace=True)
@@ -1282,14 +1279,11 @@ class Master:
             self.logger.error("get_nan_sleep_dates error: No sleep data available.")
             return []
 
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
 
         nan_days = []
         for day in df["shifted_day"].unique():
-            day_df = df[df["shifted_day"] == day].copy()
-            day_df["state"] = day_df.apply(self.assign_state, axis=1)
-            sleep_minutes = day_df[day_df["state"].isin(sleep_states)]
-            if sleep_minutes.empty:
+            if day not in daily_sleep_minutes.index or daily_sleep_minutes.loc[day] == 0:
                 nan_days.append(str(day))
 
         return sorted(nan_days)
