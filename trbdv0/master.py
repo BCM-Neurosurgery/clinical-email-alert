@@ -72,6 +72,22 @@ class Master:
 
         return sleep_df.groupby("shifted_day")["timestamp"].nunique()
 
+    @staticmethod
+    def _shifted_day(timestamps: pd.Series, offset: int = 12) -> pd.Series:
+        """Assigns timestamps to local wall-clock days starting at offset hour."""
+        local_hour = (
+            timestamps.dt.hour
+            + timestamps.dt.minute / 60.0
+            + timestamps.dt.second / 3600.0
+            + timestamps.dt.microsecond / 3600000000.0
+        )
+        before_offset = local_hour < offset
+        shifted_day = pd.Series(timestamps.dt.date, index=timestamps.index)
+        shifted_day.loc[before_offset] = shifted_day.loc[before_offset].map(
+            lambda day: day - timedelta(days=1)
+        )
+        return shifted_day
+
     def build_time_grid(
         self, num_past_days: int, offset: int = 12, end_date: str = "yesterday"
     ) -> pd.DataFrame:
@@ -449,7 +465,7 @@ class Master:
 
         # define shifted_day such that 2025-04-10 12pm to 2025-04-11 12pm is 2025-04-10
         # anything that falls before 12pm is considered the previous day
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
         # define shifted_hour such at 12pm is 0, 1pm is 1, 2pm is 2, etc.
         # with % because 3am is 15, 4am is 16, etc.
         df["shifted_hour"] = (
@@ -1178,7 +1194,7 @@ class Master:
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         # Group by day and sum steps per day
         daily_steps = df.groupby("shifted_day")["steps"].sum()
@@ -1208,7 +1224,7 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         df_lastday = df[df["shifted_day"] == lastday]
 
@@ -1313,7 +1329,7 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         df_lastday = df[df["shifted_day"] == lastday]
 
