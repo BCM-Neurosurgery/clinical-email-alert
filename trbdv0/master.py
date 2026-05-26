@@ -46,6 +46,48 @@ class Master:
             self.plot_timegrid
         )
 
+    @staticmethod
+    def _one_row_per_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+        """Keeps the latest ingested row for each timestamp before timeline joins."""
+        if df.empty or "timestamp" not in df.columns:
+            return df
+
+        return (
+            df.sort_values("timestamp", kind="mergesort")
+            .drop_duplicates(subset=["timestamp"], keep="last")
+            .reset_index(drop=True)
+        )
+
+    @staticmethod
+    def _sleep_minutes_by_day(df: pd.DataFrame) -> pd.Series:
+        """Counts sleep-phase minutes by shifted day for numeric summaries."""
+        required_cols = {"timestamp", "shifted_day", "sleep_phase_label"}
+        if df.empty or not required_cols.issubset(df.columns):
+            return pd.Series(dtype="int64")
+
+        sleep_labels = {"deep", "light", "REM"}
+        sleep_df = df[df["sleep_phase_label"].isin(sleep_labels)]
+        if sleep_df.empty:
+            return pd.Series(dtype="int64")
+
+        return sleep_df.groupby("shifted_day")["timestamp"].nunique()
+
+    @staticmethod
+    def _shifted_day(timestamps: pd.Series, offset: int = 12) -> pd.Series:
+        """Assigns timestamps to local wall-clock days starting at offset hour."""
+        local_hour = (
+            timestamps.dt.hour
+            + timestamps.dt.minute / 60.0
+            + timestamps.dt.second / 3600.0
+            + timestamps.dt.microsecond / 3600000000.0
+        )
+        before_offset = local_hour < offset
+        shifted_day = pd.Series(timestamps.dt.date, index=timestamps.index)
+        shifted_day.loc[before_offset] = shifted_day.loc[before_offset].map(
+            lambda day: day - timedelta(days=1)
+        )
+        return shifted_day
+
     def build_time_grid(
         self, num_past_days: int, offset: int = 12, end_date: str = "yesterday"
     ) -> pd.DataFrame:
@@ -367,38 +409,48 @@ class Master:
         df = time_grid.copy()
 
         # Sleep bedtimes
-        df_in_bed = self.build_master_sleep_bedtimes()
+        df_in_bed = self._one_row_per_timestamp(self.build_master_sleep_bedtimes())
         if not df_in_bed.empty:
             df_in_bed["in_bed"] = True
             df = df.merge(
-                df_in_bed[["timestamp", "in_bed"]], on="timestamp", how="left"
+                df_in_bed[["timestamp", "in_bed"]],
+                on="timestamp",
+                how="left",
+                validate="one_to_one",
             )
 
         # Sleep phases
-        df_sleep_phase = self.build_master_sleep_phases()
+        df_sleep_phase = self._one_row_per_timestamp(self.build_master_sleep_phases())
         if not df_sleep_phase.empty:
             df = df.merge(
                 df_sleep_phase[["timestamp", "phase", "phase_label"]],
                 on="timestamp",
                 how="left",
+                validate="one_to_one",
             )
 
         # Activity class
-        df_activity = self.build_master_activity_phase()
+        df_activity = self._one_row_per_timestamp(self.build_master_activity_phase())
         if not df_activity.empty:
             df = df.merge(
                 df_activity[["timestamp", "activity_class", "activity_label"]],
                 on="timestamp",
                 how="left",
+                validate="one_to_one",
             )
 
         # MET data
-        df_met = self.build_master_met()
+        df_met = self._one_row_per_timestamp(self.build_master_met())
         if not df_met.empty:
             merge_cols = ["timestamp", "met"]
             if "met_is_bug" in df_met.columns:
                 merge_cols.append("met_is_bug")
-            df = df.merge(df_met[merge_cols], on="timestamp", how="left")
+            df = df.merge(
+                df_met[merge_cols],
+                on="timestamp",
+                how="left",
+                validate="one_to_one",
+            )
 
         # 8. Fill default values
         if "in_bed" in df.columns:
@@ -413,7 +465,7 @@ class Master:
 
         # define shifted_day such that 2025-04-10 12pm to 2025-04-11 12pm is 2025-04-10
         # anything that falls before 12pm is considered the previous day
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
         # define shifted_hour such at 12pm is 0, 1pm is 1, 2pm is 2, etc.
         # with % because 3am is 15, 4am is 16, etc.
         df["shifted_hour"] = (
@@ -854,14 +906,11 @@ class Master:
             )
             return np.nan
 
-        df["state"] = df.apply(self.assign_state, axis=1)
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if daily_sleep_minutes.empty:
+            return np.nan
 
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[df["state"].isin(sleep_states)]
-
-        daily_sleep = (
-            sleep_df.groupby("shifted_day").size().rename("sleep_minutes").reset_index()
-        )
+        daily_sleep = daily_sleep_minutes.rename("sleep_minutes").reset_index()
 
         daily_sleep["sleep_hours"] = daily_sleep["sleep_minutes"] / 60.0
         avg_sleep_hours = daily_sleep["sleep_hours"].mean()
@@ -884,16 +933,11 @@ class Master:
 
         lastday = datetime.strptime(get_last_day(self.timezone), "%Y-%m-%d").date()
 
-        df = df.copy()
-        df["state"] = df.apply(self.assign_state, axis=1)
-
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[(df["shifted_day"] == lastday) & (df["state"].isin(sleep_states))]
-
-        if sleep_df.empty:
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if lastday not in daily_sleep_minutes.index:
             return np.nan
 
-        sleep_minutes = len(sleep_df)
+        sleep_minutes = daily_sleep_minutes.loc[lastday]
         sleep_hours = sleep_minutes / 60.0
 
         return sleep_hours
@@ -922,17 +966,11 @@ class Master:
             )
             return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
 
-        df = df.copy()
-        # Assign a state (e.g., 'deep_sleep', 'awake') to each minute/row
-        df["state"] = df.apply(self.assign_state, axis=1)
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
-        sleep_df = df[df["state"].isin(sleep_states)]
-
-        if sleep_df.empty:
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
+        if daily_sleep_minutes.empty:
             return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
 
-        # Group by day, count the number of minutes (rows), and store it
-        daily_sleep_minutes = sleep_df.groupby("shifted_day").size()
+        # Group by day, count the number of unique minutes, and store it
         daily_sleep_hours = daily_sleep_minutes / 60.0
         result_df = daily_sleep_hours.reset_index(name="SleepHours")
         result_df.rename(columns={"shifted_day": "Date"}, inplace=True)
@@ -1156,7 +1194,7 @@ class Master:
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         # Group by day and sum steps per day
         daily_steps = df.groupby("shifted_day")["steps"].sum()
@@ -1186,7 +1224,7 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         df_lastday = df[df["shifted_day"] == lastday]
 
@@ -1257,14 +1295,11 @@ class Master:
             self.logger.error("get_nan_sleep_dates error: No sleep data available.")
             return []
 
-        sleep_states = {"deep_sleep", "light_sleep", "REM_sleep"}
+        daily_sleep_minutes = self._sleep_minutes_by_day(df)
 
         nan_days = []
         for day in df["shifted_day"].unique():
-            day_df = df[df["shifted_day"] == day].copy()
-            day_df["state"] = day_df.apply(self.assign_state, axis=1)
-            sleep_minutes = day_df[day_df["state"].isin(sleep_states)]
-            if sleep_minutes.empty:
+            if day not in daily_sleep_minutes.index or daily_sleep_minutes.loc[day] == 0:
                 nan_days.append(str(day))
 
         return sorted(nan_days)
@@ -1294,7 +1329,7 @@ class Master:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         df["timestamp"] = df["timestamp"].dt.tz_convert(self.timezone)
         df["day"] = df["timestamp"].dt.date
-        df["shifted_day"] = (df["timestamp"] - pd.Timedelta(hours=offset)).dt.date
+        df["shifted_day"] = self._shifted_day(df["timestamp"], offset=offset)
 
         df_lastday = df[df["shifted_day"] == lastday]
 
