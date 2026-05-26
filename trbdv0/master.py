@@ -46,6 +46,18 @@ class Master:
             self.plot_timegrid
         )
 
+    @staticmethod
+    def _one_row_per_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+        """Keeps the latest ingested row for each timestamp before timeline joins."""
+        if df.empty or "timestamp" not in df.columns:
+            return df
+
+        return (
+            df.sort_values("timestamp", kind="mergesort")
+            .drop_duplicates(subset=["timestamp"], keep="last")
+            .reset_index(drop=True)
+        )
+
     def build_time_grid(
         self, num_past_days: int, offset: int = 12, end_date: str = "yesterday"
     ) -> pd.DataFrame:
@@ -367,38 +379,48 @@ class Master:
         df = time_grid.copy()
 
         # Sleep bedtimes
-        df_in_bed = self.build_master_sleep_bedtimes()
+        df_in_bed = self._one_row_per_timestamp(self.build_master_sleep_bedtimes())
         if not df_in_bed.empty:
             df_in_bed["in_bed"] = True
             df = df.merge(
-                df_in_bed[["timestamp", "in_bed"]], on="timestamp", how="left"
+                df_in_bed[["timestamp", "in_bed"]],
+                on="timestamp",
+                how="left",
+                validate="one_to_one",
             )
 
         # Sleep phases
-        df_sleep_phase = self.build_master_sleep_phases()
+        df_sleep_phase = self._one_row_per_timestamp(self.build_master_sleep_phases())
         if not df_sleep_phase.empty:
             df = df.merge(
                 df_sleep_phase[["timestamp", "phase", "phase_label"]],
                 on="timestamp",
                 how="left",
+                validate="one_to_one",
             )
 
         # Activity class
-        df_activity = self.build_master_activity_phase()
+        df_activity = self._one_row_per_timestamp(self.build_master_activity_phase())
         if not df_activity.empty:
             df = df.merge(
                 df_activity[["timestamp", "activity_class", "activity_label"]],
                 on="timestamp",
                 how="left",
+                validate="one_to_one",
             )
 
         # MET data
-        df_met = self.build_master_met()
+        df_met = self._one_row_per_timestamp(self.build_master_met())
         if not df_met.empty:
             merge_cols = ["timestamp", "met"]
             if "met_is_bug" in df_met.columns:
                 merge_cols.append("met_is_bug")
-            df = df.merge(df_met[merge_cols], on="timestamp", how="left")
+            df = df.merge(
+                df_met[merge_cols],
+                on="timestamp",
+                how="left",
+                validate="one_to_one",
+            )
 
         # 8. Fill default values
         if "in_bed" in df.columns:
@@ -860,7 +882,10 @@ class Master:
         sleep_df = df[df["state"].isin(sleep_states)]
 
         daily_sleep = (
-            sleep_df.groupby("shifted_day").size().rename("sleep_minutes").reset_index()
+            sleep_df.groupby("shifted_day")["timestamp"]
+            .nunique()
+            .rename("sleep_minutes")
+            .reset_index()
         )
 
         daily_sleep["sleep_hours"] = daily_sleep["sleep_minutes"] / 60.0
@@ -893,7 +918,7 @@ class Master:
         if sleep_df.empty:
             return np.nan
 
-        sleep_minutes = len(sleep_df)
+        sleep_minutes = sleep_df["timestamp"].nunique()
         sleep_hours = sleep_minutes / 60.0
 
         return sleep_hours
@@ -932,7 +957,7 @@ class Master:
             return pd.DataFrame({"Date": [], "TimeRange": [], "SleepHours": []})
 
         # Group by day, count the number of minutes (rows), and store it
-        daily_sleep_minutes = sleep_df.groupby("shifted_day").size()
+        daily_sleep_minutes = sleep_df.groupby("shifted_day")["timestamp"].nunique()
         daily_sleep_hours = daily_sleep_minutes / 60.0
         result_df = daily_sleep_hours.reset_index(name="SleepHours")
         result_df.rename(columns={"shifted_day": "Date"}, inplace=True)
