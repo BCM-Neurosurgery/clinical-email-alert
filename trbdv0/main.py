@@ -72,6 +72,9 @@ def main():
     quatrics_config_path = config["quatrics_config_path"]
     quatrics_sleep_reminder = config["quatrics_sleep_reminder"]
     quatrics_nonwear_reminder = config["quatrics_nonwear_reminder"]
+    dashboard_base_url = config.get("dashboard_base_url") or os.environ.get(
+        "DASHBOARD_BASE_URL"
+    )
     timestamp = datetime.now(pytz.timezone(timezone))
     timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
     today_date = get_todays_date()
@@ -341,7 +344,10 @@ def main():
 
     # send the main daily report email
     if all_patient_stats:
-        email_body = generate_email_body(all_patient_stats)
+        email_body = generate_email_body(
+            all_patient_stats,
+            dashboard_base_url=dashboard_base_url,
+        )
         subject = generate_subject_line(all_patient_stats)
         if args.subject_tag:
             subject = f"[{args.subject_tag}] {subject}"

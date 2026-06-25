@@ -1,9 +1,12 @@
+import html
+import os
 import smtplib
 from email.message import EmailMessage
-from pathlib import Path
 from email.utils import make_msgid
+from pathlib import Path
 from typing import List, Optional
-import os
+from urllib.parse import urlencode
+
 import pandas as pd
 import numpy as np
 from trbdv0.utils import (
@@ -166,7 +169,48 @@ def generate_subject_line(all_patient_stats: list) -> str:
     return f"{study_name} [Warning: {flagged_str} need review]"
 
 
-def generate_email_body(all_patient_stats: list) -> str:
+def _dashboard_patient_url(dashboard_base_url: str | None, patient: str) -> str | None:
+    if not dashboard_base_url:
+        return None
+
+    base_url = dashboard_base_url.strip()
+    if not base_url:
+        return None
+
+    params = urlencode(
+        {
+            "mode": "clinical",
+            "project": "trbd",
+            "section": "index",
+            "environment": "chronic",
+            "patient": patient,
+            "tab": "clinical_scores",
+        }
+    )
+    separator = "&" if "?" in base_url else "?"
+    return f"{base_url}{separator}{params}"
+
+
+def _format_patient_label(
+    patient: str,
+    label: str,
+    dashboard_base_url: str | None,
+) -> str:
+    safe_label = html.escape(label)
+    url = _dashboard_patient_url(dashboard_base_url, patient)
+    if url is None:
+        return safe_label
+
+    return (
+        f'<a href="{html.escape(url, quote=True)}" '
+        f'style="color:#1C3079; text-decoration:underline;">{safe_label}</a>'
+    )
+
+
+def generate_email_body(
+    all_patient_stats: list,
+    dashboard_base_url: str | None = None,
+) -> str:
     """
     Generate an HTML table of patient summary stats with red highlights for triggered warnings.
 
@@ -242,13 +286,18 @@ def generate_email_body(all_patient_stats: list) -> str:
         has_data_inactive = summary.get(HAS_DATA_WHILE_INACTIVE, False)
         inactive_kw = dict(is_inactive=is_inactive, has_data_inactive=has_data_inactive)
         patient_label = f"{patient} (inactive)" if is_inactive else patient
+        patient_link = _format_patient_label(
+            patient,
+            patient_label,
+            dashboard_base_url,
+        )
 
         if summary.get(MET_09_BUG_DETECTED, False):
             any_met_bug = True
 
         df_rows.append(
             {
-                PT_COLUMN: patient_label,
+                PT_COLUMN: patient_link,
                 # Sleep/rest hours group
                 LASTDAY_SLEEP_COLUMN: style(
                     f"{summary.get(LASTDAY_SLEEP_HOURS, np.nan):.1f}",
@@ -320,7 +369,11 @@ def generate_email_body(all_patient_stats: list) -> str:
 
         survey_rows.append(
             {
-                "Patient": patient,
+                "Patient": _format_patient_label(
+                    patient,
+                    patient,
+                    dashboard_base_url,
+                ),
                 "Activation (ISS)": format_score(iss, "SC1", "ISS"),
                 "Well-being (ISS)": format_score(iss, "SC2", "ISS"),
                 "Perceived Conflict (ISS)": format_score(iss, "SC3", "ISS"),
