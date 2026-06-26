@@ -1,5 +1,6 @@
 import html
 import os
+import re
 import smtplib
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -177,18 +178,26 @@ def _dashboard_patient_url(dashboard_base_url: str | None, patient: str) -> str 
     if not base_url:
         return None
 
+    patient_pk = _dashboard_patient_pk(patient)
     params = urlencode(
         {
             "mode": "clinical",
             "project": "trbd",
             "section": "index",
             "environment": "chronic",
-            "patient": patient,
+            "patient": patient_pk,
             "tab": "clinical_scores",
         }
     )
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}{params}"
+
+
+def _dashboard_patient_pk(patient: str) -> str:
+    match = re.search(r"(\d+)$", patient.strip())
+    if match is None:
+        return patient
+    return str(int(match.group(1)))
 
 
 def _format_patient_label(
