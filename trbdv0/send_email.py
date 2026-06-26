@@ -186,7 +186,7 @@ def _dashboard_patient_url(dashboard_base_url: str | None, patient: str) -> str 
             "section": "index",
             "environment": "chronic",
             "patient": patient_pk,
-            "tab": "clinical_scores",
+            "tab": "daily_activity",
         }
     )
     separator = "&" if "?" in base_url else "?"
