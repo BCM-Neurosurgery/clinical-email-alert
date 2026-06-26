@@ -332,7 +332,6 @@ class ISSProcessor(SurveyProcessor):
         return {
             "(Hypo)Mania": activation >= 155 and well_being >= 125,
             "Mixed State": activation >= 155 and well_being < 125,
-            "Euthymia": activation < 155 and well_being >= 125,
             "Depression": activation < 155 and well_being < 125,
         }
 
