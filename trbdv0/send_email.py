@@ -170,7 +170,11 @@ def generate_subject_line(all_patient_stats: list) -> str:
     return f"{study_name} [Warning: {flagged_str} need review]"
 
 
-def _dashboard_patient_url(dashboard_base_url: str | None, patient: str) -> str | None:
+def _dashboard_patient_url(
+    dashboard_base_url: str | None,
+    patient: str,
+    tab: str = "daily_activity",
+) -> str | None:
     if not dashboard_base_url:
         return None
 
@@ -186,7 +190,7 @@ def _dashboard_patient_url(dashboard_base_url: str | None, patient: str) -> str 
             "section": "index",
             "environment": "chronic",
             "patient": patient_pk,
-            "tab": "daily_activity",
+            "tab": tab,
         }
     )
     separator = "&" if "?" in base_url else "?"
@@ -204,9 +208,10 @@ def _format_patient_label(
     patient: str,
     label: str,
     dashboard_base_url: str | None,
+    tab: str = "daily_activity",
 ) -> str:
     safe_label = html.escape(label)
-    url = _dashboard_patient_url(dashboard_base_url, patient)
+    url = _dashboard_patient_url(dashboard_base_url, patient, tab=tab)
     if url is None:
         return safe_label
 
@@ -382,6 +387,7 @@ def generate_email_body(
                     patient,
                     patient,
                     dashboard_base_url,
+                    tab="clinical_scores",
                 ),
                 "Activation (ISS)": format_score(iss, "SC1", "ISS"),
                 "Well-being (ISS)": format_score(iss, "SC2", "ISS"),
