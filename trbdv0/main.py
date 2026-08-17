@@ -150,20 +150,20 @@ def main():
         warnings = master.generate_warning_flags(patient_summary_stats)
 
         # send quatrics survey if sleep_variation is triggered (skip for inactive)
-        # if not is_inactive and warnings[SLEEP_VARIATION]:
-        #     if patient in quatrics_sleep_reminder:
-        #         logger.info(
-        #             f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
-        #         )
-                # send_survey(patient, quatrics_config)
+        if not is_inactive and warnings[SLEEP_VARIATION]:
+            if patient in quatrics_sleep_reminder:
+                logger.info(
+                    f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
+                )
+                send_survey(patient, quatrics_config)
 
         # send quatrics survey if non_wear_time is triggered (skip for inactive)
-        # if not is_inactive and warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
-        #     if patient in quatrics_nonwear_reminder:
-        #         logger.info(
-        #             f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
-        #         )
-                # send_wearable_reminder(patient, quatrics_config)
+        if not is_inactive and warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
+            if patient in quatrics_nonwear_reminder:
+                logger.info(
+                    f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
+                )
+                send_wearable_reminder(patient, quatrics_config)
 
         # save summary stats to file
         summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")
