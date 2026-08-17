@@ -34,6 +34,7 @@ import json
 from trbdv0.survey_processor import init_processor, ISSProcessor
 from lfp_analysis.lfp_dashboard import config_dash
 import html
+from trbdv0.webhook import get_latest_webhook_times
 
 
 def main():
@@ -125,6 +126,12 @@ def main():
         master = Master(sleep, activity)
 
         patient_summary_stats = master.get_summary_stats()
+        patient_summary_stats.update(
+            get_latest_webhook_times(
+                patient_in_dir,
+                logger=logger,
+            )
+        )
         is_inactive = patient in inactive_patients
         patient_summary_stats[IS_INACTIVE] = is_inactive
 
@@ -347,6 +354,7 @@ def main():
         email_body = generate_email_body(
             all_patient_stats,
             dashboard_base_url=dashboard_base_url,
+            timezone=timezone,
         )
         subject = generate_subject_line(all_patient_stats)
         if args.subject_tag:

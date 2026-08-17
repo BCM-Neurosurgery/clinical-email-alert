@@ -13,6 +13,7 @@ from trbdv0.utils import (
     get_last_day,
 )
 from trbdv0.constants import *
+from trbdv0.webhook import is_webhook_over_24
 from datetime import datetime
 import numpy as np
 import os
@@ -1400,6 +1401,8 @@ class Master:
         l_non_wear_time = summary.get(LASTDAY_NON_WEAR_TIME_S)
         l_sleep_score = summary.get(LASTDAY_SLEEP_SCORE)
         avg_sleep_score = summary.get(AVERAGE_SLEEP_SCORE)
+        latest_sleep_webhook = summary.get(LATEST_SLEEP_WEBHOOK)
+        latest_activity_webhook = summary.get(LATEST_ACTIVITY_WEBHOOK)
 
         return {
             LASTDAY_SLEEP_NAN: pd.isna(l_sleep),
@@ -1430,5 +1433,11 @@ class Master:
                 and not pd.isna(avg_met)
                 and avg_met > 0
                 and (l_met < 0.75 * avg_met or l_met > 1.25 * avg_met)
+            ),
+            LATEST_SLEEP_WEBHOOK_OVER_24: is_webhook_over_24(
+                latest_sleep_webhook
+            ),
+            LATEST_ACTIVITY_WEBHOOK_OVER_24: is_webhook_over_24(
+                latest_activity_webhook
             ),
         }

@@ -19,6 +19,9 @@ AVERAGE_MET = "average_met"
 
 YESTERDAY_REST_HOURS = "yesterday_rest_hours"
 
+LATEST_SLEEP_WEBHOOK = "latest_sleep_webhook"
+LATEST_ACTIVITY_WEBHOOK = "latest_activity_webhook"
+
 MISSING_SLEEP_DATES = "missing_sleep_dates"
 NUMBER_OF_NANSLEEP_DAYS = "number_of_nansleep_days"
 NUMBER_OF_DAYS = "number_of_days"
@@ -41,6 +44,9 @@ AVERAGE_MET_NAN = "average_met_nan"
 MET_VARIATION = "met_variation"
 
 LASTDAY_NON_WEAR_TIME_OVER_8 = "lastday_non_wear_time_over_8"
+
+LATEST_SLEEP_WEBHOOK_OVER_24 = "latest_sleep_webhook_over_24"
+LATEST_ACTIVITY_WEBHOOK_OVER_24 = "latest_activity_webhook_over_24"
 
 # MET 0.9 bug detection
 MET_09_CONSECUTIVE_THRESHOLD_MIN = 360  # 6 hours in minutes
@@ -71,6 +77,9 @@ LASTDAY_MET_COLUMN = "Day-2 Average MET"
 AVERAGE_MET_COLUMN = "Average MET"
 
 YESTERDAY_REST_COLUMN = "Rest Estimate (h, Day-1)"
+
+LATEST_SLEEP_WEBHOOK_COLUMN = "Latest Sleep Data"
+LATEST_ACTIVITY_WEBHOOK_COLUMN = "Latest Activity Data"
 
 # a mapping of survey IDs to processor classes
 SURVEY_CLASSES = {

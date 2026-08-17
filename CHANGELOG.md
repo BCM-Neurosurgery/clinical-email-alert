@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-17 - last webhook columns
+
+**Author:** Thomas Kutcher + ChatGPT
+
+- Added latest sleep and daily-activity webhook timestamps to the clinician email table
+- Read webhook `event_time` from daily `webhook_times.json` files
+
 ## 2026-04-08 — MET Bug Detection, Rest Overlay, Inactive Patients
 
 **Author:** Yewen Zhou + Claude

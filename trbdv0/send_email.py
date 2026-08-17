@@ -220,10 +220,39 @@ def _format_patient_label(
         f'style="color:#1C3079; text-decoration:underline;">{safe_label}</a>'
     )
 
+def _format_webhook_time(value, timezone: str) -> str:
+    """Format a stored UTC webhook time for the clinician email."""
+    if value is None or value == "":
+        return "N/A"
+
+    timestamp = pd.to_datetime(
+        value,
+        errors="coerce",
+        utc=True,
+    )
+
+    if (
+        not isinstance(timestamp, pd.Timestamp)
+        or pd.isna(timestamp)
+    ):
+        return "N/A"
+
+    local_timestamp = timestamp.tz_convert(timezone)
+
+    date_text = local_timestamp.strftime("%Y-%m-%d")
+    time_text = local_timestamp.strftime(
+        "%I:%M %p %Z"
+    ).lstrip("0")
+
+    return (
+        f"{date_text}<br>"
+        f"<small style='color:#888'>{time_text}</small>"
+    )
 
 def generate_email_body(
     all_patient_stats: list,
     dashboard_base_url: str | None = None,
+    timezone: str = "America/Chicago",
 ) -> str:
     """
     Generate an HTML table of patient summary stats with red highlights for triggered warnings.
@@ -373,6 +402,24 @@ def generate_email_body(
                     AVERAGE_MET_NAN,
                     **inactive_kw,
                 ),
+                LATEST_SLEEP_WEBHOOK_COLUMN: style(
+                    _format_webhook_time(
+                        summary.get(LATEST_SLEEP_WEBHOOK),
+                        timezone,
+                    ),
+                    warnings,
+                    LATEST_SLEEP_WEBHOOK_OVER_24,
+                    **inactive_kw,
+                ),
+                LATEST_ACTIVITY_WEBHOOK_COLUMN: style(
+                    _format_webhook_time(
+                        summary.get(LATEST_ACTIVITY_WEBHOOK),
+                        timezone,
+                    ),
+                    warnings,
+                    LATEST_ACTIVITY_WEBHOOK_OVER_24,
+                    **inactive_kw,
+                ),
             }
         )
 
@@ -424,7 +471,7 @@ def generate_email_body(
     note = (
         f"<p style='font-size: 0.9em; color: #555;'>"
         f"<strong>Note:</strong> Cells highlighted in red indicate "
-        f"either <em>missing data</em>, sleep less than 6 hours, or values that deviate more than ±25% from the patient's average.<br>"
+        f"either <em>missing data</em>, sleep less than 6 hours, values that deviate more than ±25% from the patient's average, or a sleep/activity webhook more than 24 hours old.<br>"
         f"<strong>Sleep (12pm-12pm, Day-2 to Yesterday)</strong> is calculated as the sleep duration from "
         f"<em>12:00 PM on {lastday}</em> to <em>12:00 PM on {yesterday}</em>.<br>"
         f"<strong>Day-2 Steps</strong> is calculated as the step counts from "
