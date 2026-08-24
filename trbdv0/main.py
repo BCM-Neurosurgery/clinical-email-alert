@@ -34,6 +34,7 @@ import json
 from trbdv0.survey_processor import init_processor, ISSProcessor
 from lfp_analysis.lfp_dashboard import config_dash
 import html
+from trbdv0.webhook import get_latest_webhook_times
 
 
 def main():
@@ -125,6 +126,12 @@ def main():
         master = Master(sleep, activity)
 
         patient_summary_stats = master.get_summary_stats()
+        patient_summary_stats.update(
+            get_latest_webhook_times(
+                patient_in_dir,
+                logger=logger,
+            )
+        )
         is_inactive = patient in inactive_patients
         patient_summary_stats[IS_INACTIVE] = is_inactive
 
@@ -143,20 +150,20 @@ def main():
         warnings = master.generate_warning_flags(patient_summary_stats)
 
         # send quatrics survey if sleep_variation is triggered (skip for inactive)
-        if not is_inactive and warnings[SLEEP_VARIATION]:
-            if patient in quatrics_sleep_reminder:
-                logger.info(
-                    f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
-                )
-                send_survey(patient, quatrics_config)
+        # if not is_inactive and warnings[SLEEP_VARIATION]:
+        #     if patient in quatrics_sleep_reminder:
+        #         logger.info(
+        #             f"{SLEEP_VARIATION} triggered, sending survey to {patient}..."
+        #         )
+        #         send_survey(patient, quatrics_config)
 
         # send quatrics survey if non_wear_time is triggered (skip for inactive)
-        if not is_inactive and warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
-            if patient in quatrics_nonwear_reminder:
-                logger.info(
-                    f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
-                )
-                send_wearable_reminder(patient, quatrics_config)
+        # if not is_inactive and warnings[LASTDAY_NON_WEAR_TIME_OVER_8]:
+        #     if patient in quatrics_nonwear_reminder:
+        #         logger.info(
+        #             f"{LASTDAY_NON_WEAR_TIME_OVER_8} triggered, sending survey to {patient}..."
+        #         )
+        #         send_wearable_reminder(patient, quatrics_config)
 
         # save summary stats to file
         summary_stats_file = os.path.join(patient_out_dir, f"{patient}.json")
@@ -347,6 +354,7 @@ def main():
         email_body = generate_email_body(
             all_patient_stats,
             dashboard_base_url=dashboard_base_url,
+            timezone=timezone,
         )
         subject = generate_subject_line(all_patient_stats)
         if args.subject_tag:
