@@ -178,8 +178,9 @@ class Master:
             if pd.isna(start) or pd.isna(end):
                 continue
 
-            start = start.tz_convert(tz).floor("min")
-            end = end.tz_convert(tz).ceil("min")
+            # Round in UTC to avoid repeated or nonexistent local minutes at DST changes.
+            start = start.floor("min").tz_convert(tz)
+            end = end.ceil("min").tz_convert(tz)
 
             if start >= end:
                 continue
@@ -236,7 +237,7 @@ class Master:
 
             try:
                 start_time = (
-                    pd.to_datetime(start_str, utc=True).tz_convert(tz).floor("min")
+                    pd.to_datetime(start_str, utc=True).floor("min").tz_convert(tz)
                 )
             except Exception as e:
                 self.logger.warning(f"Invalid bedtime_start: {start_str} — {e}")
@@ -306,7 +307,7 @@ class Master:
 
             try:
                 start_time = (
-                    pd.to_datetime(start_str, utc=True).tz_convert(tz).floor("min")
+                    pd.to_datetime(start_str, utc=True).floor("min").tz_convert(tz)
                 )
             except Exception as e:
                 self.logger.warning(f"Invalid timestamp: {start_str} — {e}")
@@ -361,7 +362,7 @@ class Master:
 
             try:
                 start_time = (
-                    pd.to_datetime(start_str, utc=True).tz_convert(tz).floor("min")
+                    pd.to_datetime(start_str, utc=True).floor("min").tz_convert(tz)
                 )
             except Exception as e:
                 self.logger.warning(f"Invalid MET timestamp: {start_str} — {e}")
